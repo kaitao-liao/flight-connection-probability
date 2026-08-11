@@ -29,6 +29,18 @@ Timezone metadata is used solely for input chronology validation. It is not obse
 performance, is not an airport transfer-time measurement, and is not an input to the empirical
 delay distribution or Monte Carlo probability calculation.
 
+The frontend autocomplete artifact is generated with:
+
+```powershell
+.venv\Scripts\python scripts\generate_supported_airports.py
+```
+
+`frontend/data/supported-airports.json` is the intersection of all distinct origin/destination
+codes in the current production `historical_flights` table and supported `airportsdata` records.
+The current artifact contains 362 airports and only the fields needed for display and search:
+IATA `code`, `city`, and airport `name`. This keeps unsupported airports out of the selector and
+avoids sending the full offline metadata package to browsers.
+
 ## Retained fields
 
 | Official BTS field | Clean field | Meaning/use |

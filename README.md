@@ -23,11 +23,25 @@ An interpretable MVP API that estimates whether a passenger will make a U.S. dom
 ## Frontend architecture
 
 - `frontend/app/connection-risk-calculator.tsx` owns the form state, client-side validation, loading/error states, and quantitative result presentation.
+- `frontend/app/airport-combobox.tsx` provides accessible, keyboard-navigable airport search by IATA code, city, or airport name.
+- `frontend/data/supported-airports.json` is a generated browser-sized list containing only airports present in BTS history with supported offline timezone metadata.
 - `frontend/app/api-client.ts` is the typed HTTP boundary for `POST /api/v1/connection-risk`; it never substitutes mock results when the API fails.
 - `frontend/app/globals.css` provides the responsive, accessible card layout without a component framework.
 - `frontend/tests/connection-risk-calculator.test.tsx` covers normalization, validation, submission, loading, response formatting, scenarios, fallback warnings, disclaimers, and API errors.
 
 Business and modeling logic remain in Python. The browser only validates basic input shape, submits the itinerary, and presents the backend response.
+
+Regenerate the supported-airport artifact after replacing the historical database or upgrading
+`airportsdata`:
+
+```powershell
+.venv\Scripts\python scripts\generate_supported_airports.py
+```
+
+The generator takes the union of `origin` and `destination` codes in `historical_flights`, then
+intersects it with pinned `airportsdata` records that have an IATA code, an IANA timezone, and a
+U.S. or supported U.S.-territory country code. The committed JSON contains only `code`, `city`,
+and `name`; the full airport dataset is not shipped to the browser.
 
 ## Setup and development data
 

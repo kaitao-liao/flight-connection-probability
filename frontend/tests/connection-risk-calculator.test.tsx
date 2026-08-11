@@ -43,6 +43,16 @@ async function validSubmission() {
   return user;
 }
 
+async function chooseAirport(
+  user: ReturnType<typeof userEvent.setup>, label: string, search: string, option: RegExp,
+) {
+  const input = screen.getByLabelText(label);
+  await user.clear(input);
+  await user.type(input, search);
+  await user.click(await screen.findByRole("option", { name: option }));
+  return input;
+}
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe("ConnectionRiskCalculator", () => {
@@ -55,13 +65,31 @@ describe("ConnectionRiskCalculator", () => {
     expect(screen.queryByText(/%/)).not.toBeInTheDocument();
   });
 
-  it("normalizes carrier and airport inputs to uppercase", async () => {
+  it("searches airports by IATA code and retains the human-readable selection", async () => {
+    const user = userEvent.setup();
+    render(<ConnectionRiskCalculator />);
+    const origin = await chooseAirport(user, "Origin airport", "LAX", /Los Angeles International Airport.*LAX/i);
+    expect(origin).toHaveValue("Los Angeles — Los Angeles International Airport (LAX)");
+  });
+
+  it("searches airports by city and airport name", async () => {
+    const user = userEvent.setup();
+    render(<ConnectionRiskCalculator />);
+    const connection = await chooseAirport(user, "Connection airport", "Atlanta", /Hartsfield.*ATL/i);
+    expect((connection as HTMLInputElement).value).toContain("Atlanta");
+    const destination = await chooseAirport(user, "Final destination", "Logan", /Boston.*Logan.*BOS/i);
+    expect((destination as HTMLInputElement).value).toContain("(BOS)");
+  });
+
+  it("supports keyboard navigation and selection", async () => {
     const user = userEvent.setup();
     render(<ConnectionRiskCalculator />);
     const origin = screen.getByLabelText("Origin airport");
     await user.clear(origin);
-    await user.type(origin, "lax1");
-    expect(origin).toHaveValue("LAX");
+    await user.type(origin, "Los Angeles");
+    await user.keyboard("{ArrowDown}{Enter}");
+    expect(origin).toHaveValue("Los Angeles — Los Angeles International Airport (LAX)");
+    expect(origin).toHaveAttribute("aria-expanded", "false");
   });
 
   it("shows client-side validation and does not submit invalid input", async () => {
@@ -71,7 +99,21 @@ describe("ConnectionRiskCalculator", () => {
     render(<ConnectionRiskCalculator />);
     await user.clear(screen.getByLabelText("Origin airport"));
     await user.click(screen.getByRole("button", { name: /calculate connection probability/i }));
-    expect(await screen.findByText("Use a 3-letter U.S. airport code.")).toBeInTheDocument();
+    expect(await screen.findByText("Select a supported airport from the list.")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not submit unsupported arbitrary airport text", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<ConnectionRiskCalculator />);
+    const origin = screen.getByLabelText("Origin airport");
+    await user.clear(origin);
+    await user.type(origin, "ZZZ Unknown Airport");
+    expect(screen.getByText("No supported airports found")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /calculate connection probability/i }));
+    expect(await screen.findByText("Select a supported airport from the list.")).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -126,12 +168,8 @@ describe("ConnectionRiskCalculator", () => {
     const user = await validSubmission();
     expect(await screen.findByText("78.2", { exact: false })).toBeInTheDocument();
 
-    const origin = screen.getByLabelText("Origin airport");
-    const connection = screen.getByLabelText("Connection airport");
-    await user.clear(origin);
-    await user.type(origin, "LAX");
-    await user.clear(connection);
-    await user.type(connection, "ATL");
+    await chooseAirport(user, "Origin airport", "LAX", /Los Angeles International Airport.*LAX/i);
+    await chooseAirport(user, "Connection airport", "ATL", /Hartsfield.*ATL/i);
     await user.click(screen.getByRole("button", { name: /calculate connection probability/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("not valid after accounting for the airports' local time zones");

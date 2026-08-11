@@ -7,6 +7,7 @@ import {
   estimateConnectionRisk,
   ItineraryRequest,
 } from "./api-client";
+import { AirportCombobox, supportedAirportCodes } from "./airport-combobox";
 
 type FormErrors = Partial<Record<keyof ItineraryRequest, string>>;
 
@@ -50,7 +51,7 @@ function validate(form: ItineraryRequest): FormErrors {
   const errors: FormErrors = {};
   if (!/^[A-Z0-9]{2,3}$/.test(form.carrier)) errors.carrier = "Use a 2–3 character carrier code.";
   for (const { key } of airportFields) {
-    if (!/^[A-Z]{3}$/.test(form[key])) errors[key] = "Use a 3-letter U.S. airport code.";
+    if (!supportedAirportCodes.has(form[key])) errors[key] = "Select a supported airport from the list.";
   }
   if (form.origin && form.connection && form.origin === form.connection) errors.connection = "Connection must differ from origin.";
   if (form.connection && form.destination && form.connection === form.destination) errors.destination = "Destination must differ from connection.";
@@ -145,8 +146,7 @@ export function ConnectionRiskCalculator() {
   const [loading, setLoading] = useState(false);
 
   function update(key: keyof ItineraryRequest, value: string) {
-    const normalized = key === "carrier" ? normalizeCode(value, 3) :
-      airportFields.some((field) => field.key === key) ? normalizeCode(value, 3) : value;
+    const normalized = key === "carrier" ? normalizeCode(value, 3) : value;
     setForm((current) => ({ ...current, [key]: normalized }));
     setErrors((current) => ({ ...current, [key]: undefined }));
   }
@@ -184,7 +184,16 @@ export function ConnectionRiskCalculator() {
           <div className="section-heading"><div><p className="eyebrow">Your itinerary</p><h2 id="itinerary-title">Flight details</h2></div><p>Enter each time in the local time zone of that airport.</p></div>
           <form onSubmit={submit} noValidate>
             <div className="route-grid">
-              {airportFields.map(({ key, label }) => <label key={key}>{label}<input aria-invalid={Boolean(errors[key])} aria-describedby={`${key}-error`} value={form[key]} onChange={(e) => update(key, e.target.value)} placeholder="JFK" autoComplete="off" /><FieldError id={`${key}-error`} message={errors[key]} /></label>)}
+              {airportFields.map(({ key, label }) => (
+                <AirportCombobox
+                  key={key}
+                  id={key}
+                  label={label}
+                  value={form[key]}
+                  error={errors[key]}
+                  onChange={(code) => update(key, code)}
+                />
+              ))}
             </div>
             <div className="detail-grid">
               <label>Carrier<input aria-invalid={Boolean(errors.carrier)} aria-describedby="carrier-error" value={form.carrier} onChange={(e) => update("carrier", e.target.value)} placeholder="DL" autoComplete="off" /><FieldError id="carrier-error" message={errors.carrier} /></label>
