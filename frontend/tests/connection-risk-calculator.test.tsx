@@ -1,0 +1,121 @@
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ConnectionRiskCalculator, formatDelay } from "../app/connection-risk-calculator";
+
+const response = {
+  connection_probability: 0.782,
+  scheduled_layover_minutes: 85,
+  overnight_connection: false,
+  historical_sample_size: 1800,
+  delay_statistics: { median_minutes: -2, p75_minutes: 18, p90_minutes: 38 },
+  scenarios: { on_time: 0.96, delay_15: 0.87, delay_30: 0.62, delay_45: 0.29 },
+  model: {
+    version: "v1",
+    cohort_level: "route_carrier_month_time_bucket",
+    arrival_delay_evidence: "observed_completed_non_diverted_BTS_flights",
+    transfer_time: { distribution: "triangular", minimum_minutes: 10, mode_minutes: 20, maximum_minutes: 35, evidence_type: "modeling_assumption" },
+    boarding_cutoff_minutes: 15,
+    simulation_count: 10000,
+    random_seed: 42,
+    exclusions: ["cancelled flights", "diverted flights"],
+    historical_coverage: {
+      lookback_months: 24 as const,
+      available_start_date: "2023-01-01",
+      available_end_date: "2025-12-31",
+      requested_prediction_date: "2026-08-20",
+      effective_history_start_date: "2024-08-20",
+      effective_history_end_date: "2025-12-31",
+      strict_cutoff_exclusive: "2026-08-20",
+      freshness_warning: "Historical BTS data ends on 2025-12-31, 232 days before the requested prediction date.",
+    },
+  },
+};
+
+function mockJson(body: unknown, status = 200) {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: status >= 200 && status < 300, status, json: async () => body }));
+}
+
+async function validSubmission() {
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText("Travel date"), "2026-08-20");
+  await user.click(screen.getByRole("button", { name: /calculate connection probability/i }));
+  return user;
+}
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe("ConnectionRiskCalculator", () => {
+  it("renders the form, empty state, and experimental disclaimer without fake results", () => {
+    render(<ConnectionRiskCalculator />);
+    expect(screen.getByRole("heading", { name: "Will I Make My Connection?" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Origin airport")).toBeInTheDocument();
+    expect(screen.getByText("Your estimate will appear here")).toBeInTheDocument();
+    expect(screen.getByText(/Experimental research tool/)).toBeInTheDocument();
+    expect(screen.queryByText(/%/)).not.toBeInTheDocument();
+  });
+
+  it("normalizes carrier and airport inputs to uppercase", async () => {
+    const user = userEvent.setup();
+    render(<ConnectionRiskCalculator />);
+    const origin = screen.getByLabelText("Origin airport");
+    await user.clear(origin);
+    await user.type(origin, "lax1");
+    expect(origin).toHaveValue("LAX");
+  });
+
+  it("shows client-side validation and does not submit invalid input", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<ConnectionRiskCalculator />);
+    await user.clear(screen.getByLabelText("Origin airport"));
+    await user.click(screen.getByRole("button", { name: /calculate connection probability/i }));
+    expect(await screen.findByText("Use a 3-letter U.S. airport code.")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("submits normalized JSON, shows loading, and renders quantitative results", async () => {
+    let resolve!: (value: unknown) => void;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise((done) => { resolve = done; })));
+    render(<ConnectionRiskCalculator />);
+    const submission = validSubmission();
+    expect(await screen.findByRole("button", { name: /calculating probability/i })).toBeDisabled();
+    resolve({ ok: true, status: 200, json: async () => response });
+    await submission;
+    expect(await screen.findByText("78.2", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("85 min")).toBeInTheDocument();
+    expect(screen.getByText("1,800")).toBeInTheDocument();
+    expect(screen.getByText("2 min early")).toBeInTheDocument();
+    expect(screen.getByText("96.0%")).toBeInTheDocument();
+    expect(screen.getByText("29.0%")).toBeInTheDocument();
+    expect(screen.getByText("Historical data coverage notice.")).toBeInTheDocument();
+    expect(screen.queryByText(/low risk|moderate risk|high risk/i)).not.toBeInTheDocument();
+    const request = vi.mocked(fetch).mock.calls[0];
+    expect(request[0]).toContain("/api/v1/connection-risk");
+    expect(JSON.parse(String((request[1] as RequestInit).body)).origin).toBe("ATL");
+  });
+
+  it("shows a warning when the backend uses a broad fallback cohort", async () => {
+    mockJson({ ...response, model: { ...response.model, cohort_level: "route" } });
+    render(<ConnectionRiskCalculator />);
+    await validSubmission();
+    expect(await screen.findByText("Broader historical comparison used.")).toBeInTheDocument();
+  });
+
+  it("shows backend and availability errors without fabricated fallback results", async () => {
+    mockJson({ detail: "historical flight data is unavailable" }, 503);
+    render(<ConnectionRiskCalculator />);
+    await validSubmission();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Historical flight data is currently unavailable");
+    expect(screen.getByText("Your estimate will appear here")).toBeInTheDocument();
+  });
+});
+
+describe("formatDelay", () => {
+  it("formats early, on-time, and late values", () => {
+    expect(formatDelay(-4)).toBe("4 min early");
+    expect(formatDelay(0)).toBe("On time");
+    expect(formatDelay(12)).toBe("12 min late");
+  });
+});

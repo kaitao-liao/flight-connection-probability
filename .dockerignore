@@ -1,0 +1,15 @@
+**
+!Dockerfile
+!requirements-runtime.txt
+!backend/
+!backend/flight_connection/
+!backend/flight_connection/__init__.py
+!backend/flight_connection/api.py
+!backend/flight_connection/service.py
+!backend/flight_connection/schemas.py
+!backend/flight_connection/delay_model.py
+!backend/flight_connection/simulator.py
+!backend/flight_connection/acquire.py
+!data/
+!data/production/
+!data/production/flights_production.duckdb
