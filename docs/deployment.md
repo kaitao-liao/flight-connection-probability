@@ -10,18 +10,18 @@ The earlier serving/validation lookback mismatch has been resolved. See [the ser
 |---|---|---|
 | Source | GitHub repository | Code and documentation only; generated flight data remains ignored. |
 | Frontend | Vercel Hobby for a personal, non-commercial portfolio | Native Next.js builds, automatic HTTPS, Git integration, and preview deployments. |
-| Backend | Railway Hobby, using a public immutable GHCR image | Simple container deployment, automatic HTTPS, usage billing, and no need to reconstruct BTS data at startup. |
-| Database | Exact serving-only DuckDB baked into the backend image | Read-only, versioned with the image, fast startup, and exact frozen-V1 outputs. |
+| Backend | Railway Hobby, building the repository Dockerfile from GitHub | Simple automatic deployment, HTTPS, usage billing, and no need to reconstruct BTS data at startup. |
+| Database | Exact serving-only DuckDB downloaded from a versioned GitHub Release during image build | Read-only, checksum-verified, fast startup, and no database committed to Git. |
 
 Vercel describes Hobby as free for personal, non-commercial projects and documents its quotas in the [official Hobby plan documentation](https://vercel.com/docs/plans/hobby). Railway currently lists Hobby at $5/month, with that subscription applied to resource usage; CPU, RAM, storage, and egress can increase the total beyond $5 in the [official pricing documentation](https://docs.railway.com/pricing). Do not budget the Railway Free plan as reliable public hosting: it includes only $1 of monthly resources.
 
-Railway can deploy a service from a Docker image, and its public networking provides an HTTPS `*.up.railway.app` domain with automatic SSL ([services](https://docs.railway.com/services), [public networking](https://docs.railway.com/networking/public-networking)). A public GHCR package avoids Railway's paid-plan restriction for private registry credentials.
+Railway detects a root Dockerfile in a connected GitHub repository, and its public networking provides an HTTPS `*.up.railway.app` domain with automatic SSL ([services](https://docs.railway.com/services), [public networking](https://docs.railway.com/networking/public-networking)).
 
 ### Why Render is not the primary recommendation
 
 The measured API process uses about 66 MiB for a normal route query but reached approximately 397 MiB RSS during a deliberately forced global-fallback query. Render Free and Starter provide 512 MB RAM, while Standard provides 2 GB ([instance types](https://render.com/docs/compute-plans)). The 512 MB tiers leave little safe headroom for the Python runtime, concurrent requests, and platform overhead. Render Free also spins down after 15 idle minutes and has an ephemeral filesystem ([free service limitations](https://render.com/docs/free)). Render Standard is the safer Render configuration but is currently documented at approximately $25/month for 2 GB, so it is less student-friendly than Railway for this workload.
 
-Render remains a valid alternative using the same public GHCR image. Render supports prebuilt Docker images up to 10 GB compressed and pulls them again on deploy or rescheduling ([prebuilt image documentation](https://render.com/docs/deploying-an-image)). Select Standard rather than Free/Starter unless production load tests prove 512 MB safe.
+Render remains a valid alternative and can build the same Dockerfile. Select Standard rather than Free/Starter unless production load tests prove 512 MB safe.
 
 ### Fly.io and persistent-volume alternative
 
@@ -44,7 +44,7 @@ Measured on 2026-08-10:
 | Normal measured API RSS | about 66 MiB | Observational sizing result, not a hard maximum. |
 | Global-fallback measured peak RSS | about 397 MiB | Use at least 1 GiB RAM; load-test before public promotion. |
 
-The runtime dependency lock is `requirements-runtime.txt`: FastAPI, Uvicorn, DuckDB, NumPy, Pydantic, and their pinned runtime dependencies. Development-only `pytest` and `httpx` are excluded from the image.
+The runtime dependency lock is `requirements-runtime.txt`: FastAPI, Uvicorn, DuckDB, NumPy, Pydantic, and their pinned runtime dependencies. Development-only `pytest` and `httpx` are excluded from the image. The local Git-ignored DuckDB is excluded from both Git and the Docker build context.
 
 ### Artifact boundaries
 
@@ -97,7 +97,12 @@ The completed 50-case comparison produced zero maximum difference for the connec
 6d1b144fd7f7d7a7db742503b60019eb91bdc9c8a1336e9d2b0ff32c9d18776b
 ```
 
-Build the database into a versioned container image, push that image to a public GHCR package, and deploy by immutable version tag or digest. Redeploys pull the approximately 108.5 MiB database as part of the image. The database is read-only, so ephemeral service filesystems are acceptable. Rollback means selecting the previous image digest.
+The Docker build downloads the database from the fixed `v1-data` GitHub Release URL, verifies its SHA-256, and then copies the verified file into the final image. A failed download or checksum mismatch fails the build. The database is read-only, so ephemeral service filesystems are acceptable.
+
+```text
+https://github.com/kaitao-liao/flight-connection-probability/releases/download/v1-data/flights_production.duckdb
+SHA-256: 6d1b144fd7f7d7a7db742503b60019eb91bdc9c8a1336e9d2b0ff32c9d18776b
+```
 
 Frozen V1 enforces `flight_date >= prediction_date - 24 calendar months` and `flight_date < prediction_date`. Serving and validation call the same temporal cohort-query implementation. For predictions after the latest BTS record, only available observations inside that window are used; no recent data is fabricated. The API returns available/effective coverage and a warning when the request is more than 90 days after the latest record.
 
@@ -119,11 +124,13 @@ The exact eight-column projection is practical and is the chosen strategy. It re
 
 Docker is intentionally used only for the backend. The Docker context allowlist excludes raw data, tests, research outputs, caches, local environments, and frontend dependencies.
 
-Build after generating the production database:
+Build with network access to the public, versioned GitHub Release asset:
 
 ```powershell
 docker build --tag flight-connection-api:v1 .
 ```
+
+The database does not need to exist locally or in Git. The first build should show `/flights_production.duckdb: OK` from `sha256sum --check --strict`. Do not update the release URL and checksum independently.
 
 Run locally:
 
@@ -137,28 +144,20 @@ docker run --rm --name flight-connection-api `
 
 The container uses one Uvicorn worker. Multiple worker processes would multiply peak memory and are unnecessary for a portfolio MVP. `PORT` defaults to 8000 and is honored when supplied by a platform. Startup validates the database file, table, columns, and non-empty row count. A missing or corrupt database stops startup; there is no sample-data fallback.
 
-## Push source and image to GitHub
+## Push source to GitHub
 
 1. Create an empty GitHub repository.
 2. Confirm `git status` does not list any ZIP, DuckDB, `.env`, `.next`, `node_modules`, virtual environment, cache, or `work/` file.
 3. Commit and push the source normally.
-4. Authenticate Docker to GHCR using a GitHub token with `write:packages`.
-5. Build and tag the database-bearing image:
+4. Keep the DuckDB Git-ignored. The Dockerfile retrieves only the fixed release asset and verifies its fixed checksum.
+5. Connect Railway to this GitHub repository and the intended production branch.
 
-```powershell
-docker build --tag ghcr.io/YOUR_GITHUB_USER/flight-connection-api:v1 .
-docker push ghcr.io/YOUR_GITHUB_USER/flight-connection-api:v1
-```
-
-6. Mark the GHCR package public so Railway Hobby can pull it without private-registry credentials.
-7. Record the pushed image digest and deploy that digest for reproducible releases.
-
-Do not attach the raw BTS archives or full DuckDB to GitHub releases. If the serving DuckDB is separately archived for disaster recovery, publish its checksum and keep a documented access policy.
+Do not attach raw BTS archives or the full DuckDB to GitHub releases. The serving-only release asset must remain versioned and accompanied by its checksum.
 
 ## Deploy the backend to Railway
 
-1. Create a Railway project and an empty service.
-2. Set the service source to the public image `ghcr.io/YOUR_GITHUB_USER/flight-connection-api:v1` (prefer its digest after the first push).
+1. Create a Railway project and connect this GitHub repository as the service source.
+2. Confirm Railway detects the root `Dockerfile` and that automatic deployments are enabled for the production branch.
 3. Configure:
 
 ```dotenv
@@ -217,8 +216,10 @@ Missing-database failure is a startup test, not a public destructive test. Verif
 
 - **Frontend says it is not configured:** set `NEXT_PUBLIC_API_BASE_URL` in Vercel and redeploy; public variables are embedded at build time.
 - **Browser reports a CORS error:** use origins only (`https://host`, no path or trailing slash) in `FLIGHT_CONNECTION_CORS_ORIGINS`, then restart the backend.
+- **Docker download fails:** confirm Railway can reach the public versioned GitHub Release asset. Do not bypass the failed download.
+- **Docker checksum fails:** stop the deployment. Verify the release asset independently and publish a new versioned asset plus checksum instead of weakening or removing verification.
 - **Backend will not start:** confirm the image contains `/app/data/production/flights_production.duckdb`, its checksum matches the release record, and all eight serving columns exist.
 - **Container is killed under load:** move to at least 1 GiB RAM, keep one worker, and inspect whether requests are reaching `global` fallback.
 - **Railway bill exceeds the base plan:** inspect memory/CPU graphs, set usage limits, and consider controlled sleep for a demo that does not need continuous availability.
-- **Image redeploy does not change:** deploy an immutable new version tag/digest rather than reusing `latest`.
+- **Railway does not redeploy after a push:** confirm the service source is the GitHub repository, the pushed branch matches the configured production branch, and automatic deployments are enabled.
 - **Probability differs after database rebuild:** stop deployment and run the fixed-seed comparison. Do not publish an artifact unless maximum differences are zero or a future model version explicitly documents the change.

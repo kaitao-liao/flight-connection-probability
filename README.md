@@ -219,7 +219,7 @@ npm run build
 
 ## Production preparation
 
-The recommended public architecture is a Vercel-hosted Next.js frontend and a Railway-hosted backend deployed from a versioned public GHCR image. The backend image contains an exact serving-only DuckDB artifact; it never downloads or rebuilds raw BTS data at startup.
+The recommended public architecture is a Vercel-hosted Next.js frontend and a Railway-hosted backend built from the repository Dockerfile. During image build, the Dockerfile downloads the exact versioned serving DuckDB from the public `v1-data` GitHub Release and fails unless its SHA-256 matches. It never downloads or rebuilds raw BTS data at application startup, and the DuckDB remains absent from Git.
 
 Build the exact production database:
 
@@ -237,7 +237,7 @@ Verify frozen-V1 equivalence:
 
 The current serving artifact is 113,782,784 bytes rather than 712,519,680 bytes for the full research database. It retains all rows, preserves `flight_date` for strict temporal filtering, and removes only columns V1 never queries. The completed 50-case fixed-seed comparison had zero probability, scenario, quantile, cohort, or sample-size differences.
 
-See [the deployment guide](docs/deployment.md) for the artifact boundaries, platform tradeoffs, container commands, environment variables, costs and limitations, GitHub/GHCR flow, Vercel and Railway steps, and production smoke test.
+See [the deployment guide](docs/deployment.md) for the artifact boundaries, platform tradeoffs, checksum-verified container build, environment variables, costs and limitations, GitHub, Vercel and Railway steps, and production smoke test.
 
 See [the frozen V1 serving alignment report](docs/serving_alignment.md) for strict 24-month semantics, historical coverage metadata, production/full equivalence, and the repeated 2024/2025 holdout results.
 

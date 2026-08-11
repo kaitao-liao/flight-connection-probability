@@ -1,3 +1,16 @@
+FROM debian:bookworm-slim AS production-database
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+    database_url="https://github.com/kaitao-liao/flight-connection-probability/releases/download/v1-data/flights_production.duckdb"; \
+    database_sha256="6d1b144fd7f7d7a7db742503b60019eb91bdc9c8a1336e9d2b0ff32c9d18776b"; \
+    curl --fail --location --show-error --silent --retry 3 \
+      "$database_url" --output /flights_production.duckdb; \
+    echo "$database_sha256  /flights_production.duckdb" | sha256sum --check --strict
+
 FROM python:3.12.11-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -19,7 +32,7 @@ COPY backend/flight_connection/schemas.py ./backend/flight_connection/schemas.py
 COPY backend/flight_connection/delay_model.py ./backend/flight_connection/delay_model.py
 COPY backend/flight_connection/simulator.py ./backend/flight_connection/simulator.py
 COPY backend/flight_connection/acquire.py ./backend/flight_connection/acquire.py
-COPY data/production/flights_production.duckdb ./data/production/flights_production.duckdb
+COPY --from=production-database /flights_production.duckdb ./data/production/flights_production.duckdb
 
 RUN chown -R app:app /app
 USER app

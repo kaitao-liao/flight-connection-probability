@@ -10,6 +10,3 @@
 !backend/flight_connection/delay_model.py
 !backend/flight_connection/simulator.py
 !backend/flight_connection/acquire.py
-!data/
-!data/production/
-!data/production/flights_production.duckdb
