@@ -205,7 +205,9 @@ describe("ConnectionRiskCalculator", () => {
     expect(screen.getByText("29.0%")).toBeInTheDocument();
     expect(screen.getByText("Historical data only — not live flight data.")).toBeInTheDocument();
     expect(screen.getByText(/uses BTS performance records only through 2025-12-31/)).toBeInTheDocument();
-    expect(screen.getByText(/Each value assumes the first flight arrives exactly on time/)).toBeInTheDocument();
+    expect(screen.getByText(/The overall estimate includes historically early arrivals/)).toHaveTextContent(
+      "These scenarios instead assume the first flight arrives exactly on time or exactly 15, 30, or 45 minutes late; gate-to-gate transfer time is still simulated.",
+    );
     expect(screen.getByText(/historical BTS arrival performance and explicit V1 passenger-time assumptions/i)).toBeInTheDocument();
     expect(screen.queryByText(/low risk|moderate risk|high risk/i)).not.toBeInTheDocument();
     const request = vi.mocked(fetch).mock.calls[0];
@@ -219,6 +221,21 @@ describe("ConnectionRiskCalculator", () => {
     render(<ConnectionRiskCalculator />);
     await validSubmission();
     expect(await screen.findByText("Broader historical comparison used.")).toBeInTheDocument();
+  });
+
+  it("explains why an overall estimate can be positive when the exact on-time scenario is zero", async () => {
+    mockJson({
+      ...response,
+      connection_probability: 0.189,
+      scheduled_layover_minutes: 45,
+      scenarios: { ...response.scenarios, on_time: 0 },
+    });
+    render(<ConnectionRiskCalculator />);
+    await validSubmission();
+
+    expect(await screen.findByText("18.9", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("0.0%")).toBeInTheDocument();
+    expect(screen.getByText(/The overall estimate includes historically early arrivals/)).toBeInTheDocument();
   });
 
   it("shows backend and availability errors without fabricated fallback results", async () => {

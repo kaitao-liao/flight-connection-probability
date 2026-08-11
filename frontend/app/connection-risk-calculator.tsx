@@ -102,7 +102,7 @@ function ResultPanel({ result }: { result: ConnectionRiskResponse }) {
       <section className="scenario-card" aria-labelledby="scenario-title">
         <div className="section-heading">
           <div><p className="eyebrow">Sensitivity check</p><h3 id="scenario-title">First-flight arrival scenarios</h3></div>
-          <p>Each value assumes the first flight arrives exactly on time or 15, 30, or 45 minutes late. Gate-to-gate transfer time is still simulated, so probabilities can change sharply.</p>
+          <p>The overall estimate includes historically early arrivals. These scenarios instead assume the first flight arrives exactly on time or exactly 15, 30, or 45 minutes late; gate-to-gate transfer time is still simulated.</p>
         </div>
         <div className="scenario-list">
           {(Object.keys(result.scenarios) as Array<keyof typeof result.scenarios>).map((key) => {
