@@ -147,7 +147,7 @@ Request:
 }
 ```
 
-Representative response shape (values depend on the local BTS subset and random sampling):
+Representative response shape (values depend on the local BTS subset):
 
 ```json
 {
@@ -179,7 +179,7 @@ Representative response shape (values depend on the local BTS subset and random 
     },
     "boarding_cutoff_minutes": 15.0,
     "simulation_count": 20000,
-    "random_seed": null,
+    "random_seed": 5695745043292164088,
     "exclusions": ["cancelled_flights", "diverted_flights"],
     "historical_coverage": {
       "lookback_months": 24,
@@ -219,6 +219,10 @@ The boarding cutoff defaults to 15 minutes. Scenario probabilities hold arrival 
 
 The product deliberately returns a quantitative probability rather than mapping it to a qualitative risk category.
 
+Production V1 uses deterministic per-itinerary Monte Carlo seeding. The backend normalizes the model version, carrier, three airports, travel date, and all three scheduled times into canonical JSON, computes SHA-256, and interprets the first eight digest bytes as an unsigned 64-bit seed. Therefore the same canonical itinerary and model version produce the same 20,000 simulation draws and exactly the same response across repeated requests and process restarts. Changing any of those fields changes the seed. The seed remains response metadata for debugging; clients should not treat its numeric value as a business input.
+
+This removes user-visible rerun noise without changing the empirical delay distribution, cohort hierarchy, 24-month lookback, transfer-time distribution, boarding cutoff, or simulation count. Explicit `ConnectionRiskService(seed=...)` overrides remain available for research validation and unit tests.
+
 ## Time validation
 
 All schedule inputs are airport-local clock times with minute precision. `travel_date` is the departure date in the origin airport's local timezone. Before querying history or running a simulation, the backend resolves the origin and connection airports to IANA timezone names, converts scheduled departure and arrival to UTC, and requires a plausible positive elapsed duration. IANA timezone rules handle daylight saving time; fixed UTC offsets are not used.
@@ -235,7 +239,7 @@ Airport metadata comes from the pinned `airportsdata==20260803` package, whose M
 .venv\Scripts\python -m pytest -q
 ```
 
-Tests use clearly labeled synthetic unit fixtures. They cover same-day and overnight connections, cross-timezone chronology, Phoenix's non-DST timezone, a DST transition, unknown airports, excessive durations, invalid airport codes, ambiguous reversed connection times, fallback and empty-history behavior, deterministic seeded simulations, API response shape, and probability bounds.
+Tests use clearly labeled synthetic unit fixtures. They cover same-day and overnight connections, cross-timezone chronology, Phoenix's non-DST timezone, a DST transition, unknown airports, excessive durations, invalid airport codes, ambiguous reversed connection times, fallback and empty-history behavior, canonical SHA-256 seed stability across processes, deterministic service/API responses, API response shape, and probability bounds.
 
 Run frontend interaction tests, lint, and the production build from `frontend/`:
 

@@ -71,3 +71,41 @@ def test_empty_historical_database_reports_insufficient_data(tmp_path):
 def test_elapsed_minutes_rejects_seconds():
     with pytest.raises(ValueError, match="minute precision"):
         elapsed_minutes(time(10, 0, 1), time(11), label="test")
+
+
+def test_default_service_is_deterministic_per_itinerary(development_database):
+    service = ConnectionRiskService(development_database, simulations=500)
+    first = service.estimate(itinerary())
+    second = service.estimate(itinerary())
+    assert first.connection_probability == second.connection_probability
+    assert first.scenarios == second.scenarios
+    assert first.model.random_seed == second.model.random_seed
+    assert first.model.random_seed is not None
+
+
+def test_relevant_changes_update_seed_and_probability(development_database):
+    service = ConnectionRiskService(development_database, simulations=2_000)
+    baseline = service.estimate(itinerary(connecting_departure_time=time(18, 15)))
+    longer = service.estimate(itinerary(connecting_departure_time=time(18, 30)))
+    carrier = service.estimate(itinerary(
+        carrier="AA", connecting_departure_time=time(18, 15),
+    ))
+    route = service.estimate(itinerary(
+        origin="BHM", connecting_departure_time=time(18, 15),
+    ))
+
+    assert longer.model.random_seed != baseline.model.random_seed
+    assert longer.connection_probability != baseline.connection_probability
+    assert carrier.model.random_seed != baseline.model.random_seed
+    assert carrier.connection_probability != baseline.connection_probability
+    assert route.model.random_seed != baseline.model.random_seed
+    assert route.connection_probability != baseline.connection_probability
+
+
+def test_layover_monotonicity_remains_for_representative_itinerary(development_database):
+    service = ConnectionRiskService(development_database, simulations=20_000)
+    probabilities = [
+        service.estimate(itinerary(connecting_departure_time=time(18, layover - 15))).connection_probability
+        for layover in (25, 30, 45, 60)
+    ]
+    assert probabilities == sorted(probabilities)

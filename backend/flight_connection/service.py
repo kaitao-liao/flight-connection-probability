@@ -8,6 +8,7 @@ import logging
 import duckdb
 
 from .delay_model import historical_delay_distribution
+from .deterministic_seed import MODEL_VERSION, deterministic_itinerary_seed
 from .schemas import ConnectionRiskRequest, ConnectionRiskResponse
 from .simulator import TransferTimeAssumption, simulate_connection
 from .timezone_validation import first_flight_duration_minutes, validate_supported_airports
@@ -111,13 +112,17 @@ class ConnectionRiskService:
             scheduled_departure_minutes=departure_minutes,
             min_observations=self.min_observations,
         )
+        simulation_seed = (
+            self.seed if self.seed is not None
+            else deterministic_itinerary_seed(itinerary, model_version=MODEL_VERSION)
+        )
         simulation = simulate_connection(
             distribution.samples_minutes,
             layover_minutes=layover,
             simulations=self.simulations,
             boarding_cutoff_minutes=self.boarding_cutoff_minutes,
             transfer=self.transfer,
-            seed=self.seed,
+            seed=simulation_seed,
         )
         quantiles = distribution.quantiles()
         coverage = distribution.coverage
@@ -163,7 +168,7 @@ class ConnectionRiskService:
                 },
                 "boarding_cutoff_minutes": self.boarding_cutoff_minutes,
                 "simulation_count": self.simulations,
-                "random_seed": self.seed,
+                "random_seed": simulation_seed,
                 "exclusions": ["cancelled_flights", "diverted_flights"],
                 "historical_coverage": {
                     "lookback_months": 24,

@@ -73,6 +73,15 @@ def test_seed_makes_api_response_deterministic(development_database):
     assert first == second
 
 
+def test_default_api_response_is_deterministic(development_database):
+    service = ConnectionRiskService(development_database, simulations=500)
+    client = TestClient(create_app(service=service))
+    first = client.post("/api/v1/connection-risk", json=VALID_REQUEST).json()
+    second = client.post("/api/v1/connection-risk", json=VALID_REQUEST).json()
+    assert first == second
+    assert first["model"]["random_seed"] is not None
+
+
 def test_api_request_date_is_a_strict_temporal_cutoff(development_database):
     import duckdb
 
