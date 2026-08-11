@@ -19,7 +19,7 @@ body { margin: 0; background: #f4f8fb; color: var(--ink); font-family: Inter, ui
 button, input { font: inherit; }
 main { min-height: 100vh; }
 
-.hero { color: white; padding: 22px max(24px, calc((100vw - 1180px) / 2)); min-height: 310px; background: radial-gradient(circle at 88% 10%, rgba(99, 196, 218, .25), transparent 30%), linear-gradient(135deg, #082f4e, #0d5674); position: relative; overflow: hidden; }
+.hero { color: white; padding: 22px max(24px, calc((100vw - 1180px) / 2)) 92px; min-height: 310px; background: radial-gradient(circle at 88% 10%, rgba(99, 196, 218, .25), transparent 30%), linear-gradient(135deg, #082f4e, #0d5674); position: relative; overflow: hidden; }
 .hero::after { content: ""; position: absolute; right: -120px; bottom: -160px; width: 500px; height: 270px; border: 1px solid rgba(255,255,255,.13); border-radius: 50%; transform: rotate(-11deg); box-shadow: 0 0 0 48px rgba(255,255,255,.035), 0 0 0 96px rgba(255,255,255,.025); }
 .brand { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; font-size: .82rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .9; }
 .wing-mark { width: 29px; height: 12px; display: inline-block; border-top: 2px solid #65c5d9; transform: skew(-32deg); position: relative; }
@@ -100,7 +100,7 @@ dd { margin: 0; overflow-wrap: anywhere; }
   .empty-state { min-height: 280px; }
 }
 @media (max-width: 600px) {
-  .hero { padding-inline: 20px; min-height: 300px; }
+  .hero { padding-inline: 20px; padding-bottom: 70px; min-height: 300px; }
   .hero-copy { margin-top: 48px; }
   .page-grid { width: min(100% - 20px, 1180px); margin-top: -30px; }
   .form-card { padding: 22px 18px; }
