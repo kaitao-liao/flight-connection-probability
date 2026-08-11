@@ -22,3 +22,11 @@ def test_local_database_is_not_added_to_docker_build_context():
     dockerignore = Path(".dockerignore").read_text(encoding="utf-8")
     assert "!data/production/flights_production.duckdb" not in dockerignore
     assert dockerignore.splitlines()[0] == "**"
+
+
+def test_production_image_includes_timezone_validation_runtime():
+    dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
+    requirements = Path("requirements-runtime.txt").read_text(encoding="utf-8")
+    assert "COPY backend/flight_connection/timezone_validation.py" in dockerfile
+    assert "airportsdata==20260803" in requirements
+    assert "tzdata==2025.2" in requirements

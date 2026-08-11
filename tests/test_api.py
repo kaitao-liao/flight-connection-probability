@@ -39,6 +39,33 @@ def test_invalid_airport_code_returns_422(development_database):
     assert response.status_code == 422
 
 
+def test_physically_impossible_cross_timezone_schedule_returns_422(development_database):
+    client = TestClient(create_app(service=ConnectionRiskService(development_database)))
+    payload = {
+        **VALID_REQUEST,
+        "origin": "LAX",
+        "connection": "ATL",
+        "first_departure_time": "15:30",
+        "first_arrival_time": "17:45",
+        "connecting_departure_time": "18:10",
+    }
+    response = client.post("/api/v1/connection-risk", json=payload)
+    assert response.status_code == 422
+    assert "local time zones" in response.json()["detail"]
+    assert "connection_probability" not in response.json()
+
+
+def test_unknown_airport_timezone_returns_frontend_friendly_422(development_database):
+    client = TestClient(create_app(service=ConnectionRiskService(development_database)))
+    response = client.post(
+        "/api/v1/connection-risk", json={**VALID_REQUEST, "destination": "XYZ"}
+    )
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": "Timezone data is unavailable for airport XYZ. Use a supported U.S. airport code."
+    }
+
+
 def test_seed_makes_api_response_deterministic(development_database):
     client = TestClient(create_app(service=ConnectionRiskService(development_database, simulations=300, seed=42)))
     first = client.post("/api/v1/connection-risk", json=VALID_REQUEST).json()

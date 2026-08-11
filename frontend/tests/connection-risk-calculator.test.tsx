@@ -110,6 +110,34 @@ describe("ConnectionRiskCalculator", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Historical flight data is currently unavailable");
     expect(screen.getByText("Your estimate will appear here")).toBeInTheDocument();
   });
+
+  it("shows timezone validation errors and removes stale probability results", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => response })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        json: async () => ({
+          detail: "These scheduled times are not valid after accounting for the airports' local time zones. Please check the first-flight departure and arrival times.",
+        }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ConnectionRiskCalculator />);
+    const user = await validSubmission();
+    expect(await screen.findByText("78.2", { exact: false })).toBeInTheDocument();
+
+    const origin = screen.getByLabelText("Origin airport");
+    const connection = screen.getByLabelText("Connection airport");
+    await user.clear(origin);
+    await user.type(origin, "LAX");
+    await user.clear(connection);
+    await user.type(connection, "ATL");
+    await user.click(screen.getByRole("button", { name: /calculate connection probability/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("not valid after accounting for the airports' local time zones");
+    expect(screen.queryByRole("heading", { name: "Probability of making the connection" })).not.toBeInTheDocument();
+    expect(screen.getByText("Your estimate will appear here")).toBeInTheDocument();
+  });
 });
 
 describe("formatDelay", () => {

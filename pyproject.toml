@@ -8,10 +8,12 @@ version = "0.1.0"
 description = "Interpretable U.S. domestic flight connection probability MVP"
 requires-python = ">=3.11"
 dependencies = [
+    "airportsdata==20260803",
     "duckdb>=1.1,<2",
     "fastapi>=0.115,<1",
     "numpy>=2,<3",
     "pydantic>=2.9,<3",
+    "tzdata>=2025.2,<2027",
     "uvicorn>=0.30,<1",
 ]
 

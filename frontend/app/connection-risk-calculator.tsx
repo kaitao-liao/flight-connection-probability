@@ -181,7 +181,7 @@ export function ConnectionRiskCalculator() {
 
       <div className="page-grid">
         <section className="form-card" aria-labelledby="itinerary-title">
-          <div className="section-heading"><div><p className="eyebrow">Your itinerary</p><h2 id="itinerary-title">Flight details</h2></div><p>All times are local airport clock times.</p></div>
+          <div className="section-heading"><div><p className="eyebrow">Your itinerary</p><h2 id="itinerary-title">Flight details</h2></div><p>Enter each time in the local time zone of that airport.</p></div>
           <form onSubmit={submit} noValidate>
             <div className="route-grid">
               {airportFields.map(({ key, label }) => <label key={key}>{label}<input aria-invalid={Boolean(errors[key])} aria-describedby={`${key}-error`} value={form[key]} onChange={(e) => update(key, e.target.value)} placeholder="JFK" autoComplete="off" /><FieldError id={`${key}-error`} message={errors[key]} /></label>)}

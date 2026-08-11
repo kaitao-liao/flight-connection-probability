@@ -13,6 +13,7 @@ An interpretable MVP API that estimates whether a passenger will make a U.S. dom
 - `delay_model.py` returns an empirical arrival-delay distribution using documented cohort fallbacks.
 - `simulator.py` bootstraps observed delays and samples an assumed transfer-time distribution.
 - `schemas.py` defines versioned, frontend-friendly Pydantic request and response contracts.
+- `timezone_validation.py` validates supported U.S. airport schedules in UTC using airport-local IANA timezones.
 - `service.py` validates itinerary timing, calculates layovers, queries history, and runs the probability simulation.
 - `api.py` is a thin FastAPI transport layer. Business logic does not live in route handlers.
 - `scripts/example_request.py` submits a development request to a running server.
@@ -197,9 +198,13 @@ The product deliberately returns a quantitative probability rather than mapping 
 
 ## Time validation
 
-All schedule inputs are local airport clock times with minute precision. Because the request does not include a separate arrival/connection date, a time reversal is treated as next-day only when the start is at or after 18:00 and the end is at or before 12:00. Other reversed times are rejected as ambiguous or invalid. First-flight duration must be between 30 minutes and 12 hours; layovers must be at least the boarding cutoff and no more than 12 hours.
+All schedule inputs are airport-local clock times with minute precision. `travel_date` is the departure date in the origin airport's local timezone. Before querying history or running a simulation, the backend resolves the origin and connection airports to IANA timezone names, converts scheduled departure and arrival to UTC, and requires a plausible positive elapsed duration. IANA timezone rules handle daylight saving time; fixed UTC offsets are not used.
 
-This rollover rule is an MVP product-validation assumption. A later schema should accept explicit local dates or timezone-aware schedule timestamps.
+Because the request does not contain a first-flight arrival date, validation first interprets arrival on `travel_date` in the connection airport's timezone. If that instant is not after departure, it tests arrival on the following calendar day. The next-day interpretation is accepted only when the resulting scheduled duration is between 30 minutes and the deliberately generous 15-hour domestic-flight sanity limit. Otherwise the request receives HTTP 422 and no probability is calculated. The 15-hour limit accommodates long Alaska/Hawaii itineraries and is not a route-duration model.
+
+Connection layover calculation remains local to the connection airport and retains the existing deterministic rollover rule: a reversed connection time is next-day only when arrival is at or after 18:00 and connecting departure is at or before 12:00. Layovers must be at least the boarding cutoff and no more than 12 hours.
+
+Airport metadata comes from the pinned `airportsdata==20260803` package, whose MIT-licensed offline database maps IATA codes to IANA timezone names. Supported domestic jurisdictions are the United States, Puerto Rico, U.S. Virgin Islands, Guam, American Samoa, and Northern Mariana Islands. Unknown or unsupported airports are rejected rather than guessed. This validation does not change the frozen V1 delay estimator, cohort hierarchy, 24-month lookback, Monte Carlo simulation, or transfer-time assumptions.
 
 ## Tests
 
@@ -207,7 +212,7 @@ This rollover rule is an MVP product-validation assumption. A later schema shoul
 .venv\Scripts\python -m pytest -q
 ```
 
-Tests use clearly labeled synthetic unit fixtures. They cover same-day and overnight connections, invalid airport codes, ambiguous reversed times, fallback and empty-history behavior, deterministic seeded simulations, API response shape, and probability bounds.
+Tests use clearly labeled synthetic unit fixtures. They cover same-day and overnight connections, cross-timezone chronology, Phoenix's non-DST timezone, a DST transition, unknown airports, excessive durations, invalid airport codes, ambiguous reversed connection times, fallback and empty-history behavior, deterministic seeded simulations, API response shape, and probability bounds.
 
 Run frontend interaction tests, lint, and the production build from `frontend/`:
 
@@ -247,6 +252,7 @@ See [the frozen V1 serving alignment report](docs/serving_alignment.md) for stri
 - Transfer time is a generic assumption, not measured airport-specific data. It does not model terminals, gates, mobility, checked bags, or security re-screening.
 - The boarding cutoff is configurable but is not a universal airline policy.
 - The API uses reporting carrier, not marketing carrier.
+- Airport-local timezone conversion validates only the scheduled chronology of the first flight; it does not add schedule data or alter probability estimation. Ambiguous local times during the autumn DST fold use Python `zoneinfo`'s default first occurrence because the request has no UTC offset or fold indicator.
 - Frozen V1 uses only strictly prior observations from the previous 24 calendar months. Available BTS history currently spans 2023-01-01 through 2025-12-31; later predictions do not fabricate newer observations and return a freshness warning when the coverage gap exceeds 90 days.
 - The development database is deterministically stratified; model validation should still use the full database or an explicitly designed evaluation sample.
 - Estimates do not yet include confidence intervals or model calibration results.

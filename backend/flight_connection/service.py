@@ -10,6 +10,7 @@ import duckdb
 from .delay_model import historical_delay_distribution
 from .schemas import ConnectionRiskRequest, ConnectionRiskResponse
 from .simulator import TransferTimeAssumption, simulate_connection
+from .timezone_validation import first_flight_duration_minutes, validate_supported_airports
 
 LOGGER = logging.getLogger("flight_connection.service")
 
@@ -81,11 +82,14 @@ class ConnectionRiskService:
             raise RuntimeError(f"historical flight database is unreadable: {error}") from error
 
     def estimate(self, itinerary: ConnectionRiskRequest) -> ConnectionRiskResponse:
-        first_duration, _ = elapsed_minutes(
-            itinerary.first_departure_time, itinerary.first_arrival_time, label="first flight arrival"
+        validate_supported_airports(itinerary.origin, itinerary.connection, itinerary.destination)
+        first_flight_duration_minutes(
+            travel_date=itinerary.travel_date,
+            departure_time=itinerary.first_departure_time,
+            arrival_time=itinerary.first_arrival_time,
+            origin=itinerary.origin,
+            connection=itinerary.connection,
         )
-        if first_duration < 30 or first_duration > 12 * 60:
-            raise ValueError("scheduled first-flight duration must be between 30 minutes and 12 hours")
 
         layover, overnight = elapsed_minutes(
             itinerary.first_arrival_time,

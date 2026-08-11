@@ -15,6 +15,7 @@ data/production/*
 !frontend/.env.example
 frontend/node_modules/
 frontend/.next/
+*.tsbuildinfo
 frontend/out/
 frontend/.vercel/
 *.log

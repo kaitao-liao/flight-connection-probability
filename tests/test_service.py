@@ -31,7 +31,11 @@ def test_same_day_connection(development_database):
     assert result.model.historical_coverage.effective_history_start_date == date(2024, 8, 20)
     assert result.model.historical_coverage.strict_cutoff_exclusive == date(2026, 8, 20)
     assert "Historical BTS data ends" in result.model.historical_coverage.freshness_warning
-    assert 0 <= result.connection_probability <= 1
+    # Frozen seeded regression: timezone chronology validation must not alter V1 simulation output.
+    assert result.connection_probability == 1.0
+    assert result.scenarios.model_dump() == {
+        "on_time": 1.0, "delay_15": 1.0, "delay_30": 1.0, "delay_45": 0.732,
+    }
 
 
 def test_overnight_connection(development_database):
@@ -45,7 +49,10 @@ def test_overnight_connection(development_database):
 
 
 def test_connecting_departure_before_arrival_is_invalid_when_not_overnight(development_database):
-    request = itinerary(first_arrival_time=time(15), connecting_departure_time=time(14))
+    request = itinerary(
+        first_departure_time=time(13), first_arrival_time=time(15),
+        connecting_departure_time=time(14),
+    )
     with pytest.raises(ValueError, match="overnight rule"):
         ConnectionRiskService(development_database).estimate(request)
 

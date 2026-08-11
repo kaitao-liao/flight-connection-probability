@@ -15,6 +15,20 @@ The current historical foundation contains all 36 monthly reporting-carrier file
 
 Raw ZIPs, generated DuckDB databases, and JSON build reports are excluded from Git.
 
+## Airport timezone reference data
+
+Request validation uses the offline airport database distributed by
+[`airportsdata==20260803`](https://pypi.org/project/airportsdata/20260803/). The package is
+MIT licensed and provides IATA codes, ISO country codes, and IANA-compliant `tz` names. The
+project pins the package version in `pyproject.toml` for reproducibility. At runtime, only IATA
+airports in the United States and included U.S. domestic territories are loaded; an absent code
+is rejected instead of assigned a guessed timezone. Python's standard-library `zoneinfo` applies
+the installed IANA timezone rules, including daylight saving transitions.
+
+Timezone metadata is used solely for input chronology validation. It is not observed BTS flight
+performance, is not an airport transfer-time measurement, and is not an input to the empirical
+delay distribution or Monte Carlo probability calculation.
+
 ## Retained fields
 
 | Official BTS field | Clean field | Meaning/use |
