@@ -1,112 +1,144 @@
 # Flight Connection Probability
 
-An interpretable MVP API that estimates whether a passenger will make a U.S. domestic-to-domestic flight connection. It combines observed BTS arrival delays with an explicitly assumed airport transfer-time model. It does not use real-time or paid data.
+Flight Connection Probability is a web application that estimates the probability of making a U.S. domestic flight connection. It combines historical U.S. Bureau of Transportation Statistics (BTS) arrival performance with explicit, documented V1 passenger connection-time assumptions.
 
-## Backend architecture
+## What It Does
 
-- `acquire.py` provides official monthly BTS download and HHMM utilities.
-- `data_pipeline.py` builds resumable full and deterministically stratified development DuckDB datasets.
-- `analyze_data.py` generates cohort-coverage, fallback-frequency, and year-over-year reports.
-- `validation.py` runs strict temporal holdouts, rolling-window comparisons, quantile scoring, status-risk prototypes, and connection calibration replay.
-- `stratified_validation.py` runs the larger design-weighted study, bootstrap intervals, subgroup diagnostics, and error-case extraction.
-- `upper_tail_experiments.py` provides exact lazy temporal caching and isolated empirical upper-tail candidate experiments.
-- `delay_model.py` returns an empirical arrival-delay distribution using documented cohort fallbacks.
-- `simulator.py` bootstraps observed delays and samples an assumed transfer-time distribution.
-- `schemas.py` defines versioned, frontend-friendly Pydantic request and response contracts.
-- `timezone_validation.py` validates supported U.S. airport schedules in UTC using airport-local IANA timezones.
-- `service.py` validates itinerary timing, calculates layovers, queries history, and runs the probability simulation.
-- `api.py` is a thin FastAPI transport layer. Business logic does not live in route handlers.
-- `scripts/example_request.py` submits a development request to a running server.
-- `schema.sql` defines the cleaned historical-flight table.
-- `docs/data.md` records exact BTS sources, fields, and cleaning lineage.
+Users provide:
 
-## Frontend architecture
+- origin, connection, and destination airports;
+- reporting carrier;
+- travel date;
+- scheduled first-flight departure and arrival times; and
+- scheduled connecting-flight departure time.
 
-- `frontend/app/connection-risk-calculator.tsx` owns the form state, client-side validation, loading/error states, and quantitative result presentation.
-- `frontend/app/airport-combobox.tsx` provides accessible, keyboard-navigable airport search by IATA code, city, or airport name.
-- `frontend/app/carrier-combobox.tsx` provides carrier-code and airline-name search while retaining only the reporting carrier code in form state.
-- `frontend/data/supported-airports.json` is a generated browser-sized list containing only airports present in BTS history with supported offline timezone metadata.
-- `frontend/data/supported-carriers.json` contains only reporting carriers present in the production BTS history.
-- `frontend/app/api-client.ts` is the typed HTTP boundary for `POST /api/v1/connection-risk`; it never substitutes mock results when the API fails.
-- `frontend/app/globals.css` provides the responsive, accessible card layout without a component framework.
-- `frontend/tests/connection-risk-calculator.test.tsx` covers normalization, validation, submission, loading, response formatting, scenarios, fallback warnings, disclaimers, and API errors.
+The application returns:
 
-Business and modeling logic remain in Python. The browser only validates basic input shape, submits the itinerary, and presents the backend response.
+- the estimated probability of making the connection;
+- scheduled layover duration;
+- historical cohort size and fallback level;
+- median, 75th-percentile, and 90th-percentile arrival delays; and
+- sensitivity scenarios for an inbound flight arriving exactly on time or 15, 30, or 45 minutes late.
 
-Regenerate the supported-airport artifact after replacing the historical database or upgrading
-`airportsdata`:
+Airport and carrier fields use searchable, offline-supported lists. The backend continues to receive IATA airport codes and BTS reporting-carrier codes.
 
-```powershell
-.venv\Scripts\python scripts\generate_supported_airports.py
-.venv\Scripts\python scripts\generate_supported_carriers.py
+## How the Estimate Works
+
+V1 follows an interpretable pipeline:
+
+1. Select only BTS flights from the 24 calendar months before the requested travel date. The upper bound is exclusive, so future records cannot leak into an estimate.
+2. Find a historical cohort using carrier, route, month or season, day of week, and scheduled departure-time bucket. The first cohort with at least 30 observations is used.
+3. Resample arrival delays from that empirical cohort. Negative delays represent flights that arrived early.
+4. Run 20,000 Monte Carlo simulations of the passenger connection process.
+
+A simulated connection succeeds when:
+
+```text
+arrival delay
++ 20-minute deplaning time
++ Triangular(15, 25, 40)-minute gate-to-gate transfer time
++ 15-minute boarding cutoff
+<= scheduled layover
 ```
 
-The generator takes the union of `origin` and `destination` codes in `historical_flights`, then
-intersects it with pinned `airportsdata` records that have an IATA code, an IANA timezone, and a
-U.S. or supported U.S.-territory country code. The committed JSON contains only `code`, `city`,
-and `name`; the full airport dataset is not shipped to the browser.
+The arrival-delay distribution is observed BTS evidence. The 20-minute deplaning time, triangular gate-transfer distribution, and 15-minute boarding cutoff are explicit **V1 modeling assumptions**, not BTS-observed passenger movement data.
 
-The carrier generator reads distinct `reporting_carrier` values from the production
-`historical_flights` table and joins them to human-readable names from the official BTS Unique
-Carrier lookup. It fails if a production code has no maintained name instead of silently hiding
-the carrier. The browser artifact contains only `code` and `name`, and API requests continue to
-send the code alone.
+The overall estimate samples the complete historical arrival-delay distribution, including early arrivals. Sensitivity scenarios instead fix arrival delay at exactly 0, 15, 30, or 45 minutes while continuing to simulate gate-transfer time.
 
-## Setup and development data
+## Historical Cohort Fallback
 
-Requires Python 3.11+.
+The cohort hierarchy is:
+
+1. carrier, route, month, day of week, and time bucket;
+2. carrier, route, month, and time bucket;
+3. carrier, route, and adjacent-month season;
+4. carrier and route;
+5. route;
+6. carrier; and
+7. global history.
+
+If a level has fewer than 30 strictly prior observations, V1 moves to the next broader comparison. The hard N=30 boundary was examined in a reproducible [fallback-boundary audit](docs/fallback_boundary_audit.md) and retained for V1. The response exposes the selected cohort and sample size.
+
+## Deterministic Results
+
+Monte Carlo sampling is deterministically seeded from canonical itinerary fields and the model version using SHA-256. Identical inputs under the same model version therefore return the same probability across repeated requests and process restarts. This improves reproducibility without changing the empirical distribution or simulation assumptions.
+
+## Time Zones
+
+All schedule fields are local airport clock times. The backend maps supported airports to IANA time zones, converts the first-flight schedule to UTC, and rejects physically impossible cross-timezone itineraries with HTTP 422.
+
+The travel date is the departure date at the origin airport. Existing rules also support plausible next-day first-flight arrivals and overnight connections while rejecting ambiguous or excessive durations. See [time validation details](docs/serving_alignment.md) and the API tests for the enforced boundaries.
+
+## Data
+
+The empirical model uses the official [BTS On-Time Performance dataset](https://www.transtats.bts.gov/DL_SelectFields.aspx?QO_fu146_anzr=b0-gvzr&gnoyr_VQ=FGJ).
+
+Current repository data coverage is **2023-01-01 through 2025-12-31**. The full cleaned historical table contains **20,588,134 completed, non-diverted flights with observed arrival delay**. Exact sources, downloaded files, fields, cleaning rules, status counts, and reproducibility details are documented in [docs/data.md](docs/data.md).
+
+This is historical data, not live flight data. Cancellations and diversions remain available for data-quality auditing but are excluded from the completed-flight arrival-delay distribution; V1 does not model their probability as connection outcomes.
+
+The production API uses an exact serving-only DuckDB projection containing the same rows and the eight fields queried by V1. The artifact is downloaded from a versioned GitHub Release and SHA-256 verified during the Docker build; it is not committed to Git.
+
+## Validation
+
+The repository includes reproducible validation and diagnostic work, without claiming measured real-world passenger connection accuracy:
+
+- [Probability sanity checks](docs/probability_sanity_check.md) verified layover monotonicity, fixed-delay sensitivity ordering, cohort selection, probability bounds, and representative carrier/time-of-day behavior.
+- Deterministic testing produced zero variation across 50 repeated direct estimates and 12 repeated API requests for each checked itinerary.
+- The [fallback-boundary audit](docs/fallback_boundary_audit.md) evaluated 160 balanced near-threshold cases and temporal holdouts; N=30 remained competitive and was retained for V1.
+- [Temporal validation](docs/model_validation.md), [stratified validation](docs/stratified_validation.md), and [serving-alignment validation](docs/serving_alignment.md) document leakage controls, cohort behavior, calibration diagnostics, and exact full/production database equivalence.
+- Automated tests cover timezone chronology, overnight handling, API schema and errors, deterministic seeds, fallback behavior, frontend validation, autocomplete keyboard behavior, loading/error states, and stale-result prevention.
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js, React, TypeScript |
+| Backend | FastAPI, Python, Pydantic, NumPy |
+| Data and serving | DuckDB, BTS historical flight-performance data |
+| Airport metadata | pinned offline `airportsdata` dataset and IANA time zones |
+| Deployment | Vercel frontend, Railway backend, Docker |
+
+## Limitations
+
+V1 does not use or model:
+
+- live flight status;
+- live weather or FAA operational conditions;
+- actual gates, terminal changes, or airport-specific walking times;
+- real-time airport congestion;
+- aircraft type, seat position, or aircraft-specific deplaning times;
+- security re-screening, mobility needs, checked-bag handling, or airline reaccommodation; or
+- cancellation and diversion probabilities.
+
+Passenger-time parameters are generic, transparent V1 assumptions rather than directly observed passenger-connection data. The boarding cutoff is not presented as a universal airline policy. Estimates are research-oriented probabilities, not guarantees or an airline operational decision system.
+
+## Local Development
+
+### Backend and data
+
+Requires Python 3.11 or newer. From the repository root:
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\python -m pip install -e ".[dev]"
 .venv\Scripts\python -m backend.flight_connection.data_pipeline --mode both --years 2023 2024 2025
-```
-
-The pipeline downloads 36 official monthly ZIPs to `data/raw/`, creates `data/processed/flights_full.duckdb`, and creates a deterministic representative `data/processed/flights_development.duckdb`. These generated artifacts are excluded from Git. Use `--resume` after interruption. See [the data documentation](docs/data.md) for source URLs, field lineage, actual row counts, quality results, sampling methodology, coverage, and year-over-year findings.
-
-Run the reproducible sampled temporal validation:
-
-```powershell
-.venv\Scripts\python -m backend.flight_connection.validation --mode sampled --cases-per-split 50
-```
-
-`--mode full` raises the default to 1,000 cases per split and is substantially slower. The completed sampled run, leakage controls, metrics, calibration data, and recommendations are documented in [the temporal validation report](docs/model_validation.md).
-
-Run the larger population-weighted stratified diagnostic study:
-
-```powershell
-.venv\Scripts\python -m backend.flight_connection.stratified_validation --delay-cases 500 --connection-cases 300 --bootstrap-replicates 500
-```
-
-The completed study, upper-tail localization, confidence intervals, calibration data, and failure cases are documented in [the larger stratified validation report](docs/stratified_validation.md).
-
-Run the leakage-safe accelerated upper-tail candidate experiment:
-
-```powershell
-.venv\Scripts\python -m backend.flight_connection.upper_tail_experiments --arrival-cases 2000 --connection-cases 1000 --bootstrap-replicates 300
-```
-
-The exact acceleration benchmark, four-candidate comparison, cluster-aware intervals, connection impact, and V1 decision are documented in [the upper-tail experiment report](docs/upper_tail_experiments.md).
-
-## Start the API
-
-From the repository root:
-
-```powershell
 .venv\Scripts\python -m uvicorn backend.flight_connection.api:app --reload
 ```
 
-The default API database is `data/processed/flights_development.duckdb`. Override it when needed:
+The data pipeline downloads the 36 official monthly archives, builds the full research database, and creates a deterministic development subset. Generated ZIP and DuckDB files are Git-ignored. Use `--resume` after an interrupted download.
+
+The API defaults to `data/processed/flights_development.duckdb`. Override it when necessary:
 
 ```powershell
 $env:FLIGHT_CONNECTION_DB = "C:\path\to\flights.duckdb"
 ```
 
-Interactive OpenAPI documentation is available at `http://127.0.0.1:8000/docs`.
+OpenAPI documentation is available at `http://127.0.0.1:8000/docs`.
 
-## Start the frontend
+### Frontend
 
-Requires Node.js 22.13 or newer. In a second terminal, from `frontend/`:
+Requires Node.js 22.13 or newer. From `frontend/` in a second terminal:
 
 ```powershell
 Copy-Item .env.example .env.local
@@ -114,183 +146,61 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. The development environment defaults to `http://127.0.0.1:8000`; set the browser-visible API base URL explicitly when needed:
+Open `http://localhost:3000`. For local development, configure:
 
 ```dotenv
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 ```
 
-The backend allows only `http://localhost:3000` and `http://127.0.0.1:3000` by default. To use another local frontend origin, provide an explicit comma-separated allowlist before starting FastAPI:
-
-```powershell
-$env:FLIGHT_CONNECTION_CORS_ORIGINS = "http://localhost:3000,http://127.0.0.1:3000"
-```
-
-No wildcard CORS origin is enabled.
-
-## API
-
-`POST /api/v1/connection-risk`
-
-Request:
-
-```json
-{
-  "carrier": "DL",
-  "origin": "ATL",
-  "connection": "JFK",
-  "destination": "BOS",
-  "travel_date": "2026-08-20",
-  "first_departure_time": "15:30",
-  "first_arrival_time": "17:45",
-  "connecting_departure_time": "19:10"
-}
-```
-
-Representative response shape (values depend on the local BTS subset):
-
-```json
-{
-  "connection_probability": 0.78,
-  "scheduled_layover_minutes": 85,
-  "overnight_connection": false,
-  "historical_sample_size": 1800,
-  "delay_statistics": {
-    "median_minutes": 7.0,
-    "p75_minutes": 18.0,
-    "p90_minutes": 38.0
-  },
-  "scenarios": {
-    "on_time": 0.96,
-    "delay_15": 0.87,
-    "delay_30": 0.62,
-    "delay_45": 0.29
-  },
-  "model": {
-    "version": "v1",
-    "cohort_level": "route_carrier_month_bucket",
-    "arrival_delay_evidence": "observed_completed_non_diverted_BTS_flights",
-    "deplaning_time": {
-      "fixed_minutes": 20.0,
-      "evidence_type": "modeling_assumption"
-    },
-    "transfer_time": {
-      "distribution": "triangular",
-      "minimum_minutes": 15.0,
-      "mode_minutes": 25.0,
-      "maximum_minutes": 40.0,
-      "evidence_type": "modeling_assumption"
-    },
-    "boarding_cutoff_minutes": 15.0,
-    "simulation_count": 20000,
-    "random_seed": 5695745043292164088,
-    "exclusions": ["cancelled_flights", "diverted_flights"],
-    "historical_coverage": {
-      "lookback_months": 24,
-      "available_start_date": "2023-01-01",
-      "available_end_date": "2025-12-31",
-      "requested_prediction_date": "2026-08-20",
-      "effective_history_start_date": "2024-08-20",
-      "effective_history_end_date": "2025-12-31",
-      "strict_cutoff_exclusive": "2026-08-20",
-      "freshness_warning": "Historical BTS data ends on 2025-12-31, 232 days before the requested prediction date."
-    }
-  }
-}
-```
-
-Run the included example against a running server:
+### Example API request
 
 ```powershell
 .venv\Scripts\python scripts\example_request.py
 ```
 
-An equivalent PowerShell request is:
+Or submit the checked-in request directly:
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/connection-risk -ContentType application/json -Body (Get-Content examples\connection_request.json -Raw)
+Invoke-RestMethod `
+  -Method Post `
+  -Uri http://127.0.0.1:8000/api/v1/connection-risk `
+  -ContentType application/json `
+  -Body (Get-Content examples\connection_request.json -Raw)
 ```
 
-## Methodology
+### Tests
 
-Frozen V1 first restricts history to `flight_date >= travel_date - 24 calendar months` and `flight_date < travel_date`. It then searches these cohorts until it finds the configured minimum number of observations (default 30): exact carrier/route/month/day-of-week/time bucket; carrier/route/month/time bucket; carrier/route/adjacent-month season; carrier/route; route; carrier; global. Serving and validation use the same temporal cohort-query implementation. The response exposes the selected level, observation count, effective history, available BTS coverage, and any freshness warning.
-
-The simulator resamples the selected observed arrival delays. Connection probability combines that empirical distribution with V1 passenger-transfer assumptions: 20 fixed minutes for deplaning, a triangular 15/25/40-minute gate-to-gate transfer distribution (minimum/mode/maximum), and a 15-minute boarding cutoff. Success means:
-
-`arrival delay + deplaning time + gate-transfer time + boarding cutoff <= scheduled layover`
-
-All passenger-time values are explicit V1 modeling assumptions, not BTS-observed passenger movement data. Scenario probabilities hold arrival delay fixed at 0, 15, 30, or 45 minutes while sampling gate-to-gate transfer time. The theoretical minimum passenger requirement before arrival delay is 50 minutes; its mode is 60 minutes and maximum is 75 minutes.
-
-The product deliberately returns a quantitative probability rather than mapping it to a qualitative risk category.
-
-Production V1 uses deterministic per-itinerary Monte Carlo seeding. The backend normalizes the model version, carrier, three airports, travel date, and all three scheduled times into canonical JSON, computes SHA-256, and interprets the first eight digest bytes as an unsigned 64-bit seed. Therefore the same canonical itinerary and model version produce the same 20,000 simulation draws and exactly the same response across repeated requests and process restarts. Changing any of those fields changes the seed. The seed remains response metadata for debugging; clients should not treat its numeric value as a business input.
-
-This removes user-visible rerun noise without changing the empirical delay distribution, cohort hierarchy, 24-month lookback, or simulation count. Explicit `ConnectionRiskService(seed=...)` overrides remain available for research validation and unit tests.
-
-## Time validation
-
-All schedule inputs are airport-local clock times with minute precision. `travel_date` is the departure date in the origin airport's local timezone. Before querying history or running a simulation, the backend resolves the origin and connection airports to IANA timezone names, converts scheduled departure and arrival to UTC, and requires a plausible positive elapsed duration. IANA timezone rules handle daylight saving time; fixed UTC offsets are not used.
-
-Because the request does not contain a first-flight arrival date, validation first interprets arrival on `travel_date` in the connection airport's timezone. If that instant is not after departure, it tests arrival on the following calendar day. The next-day interpretation is accepted only when the resulting scheduled duration is between 30 minutes and the deliberately generous 15-hour domestic-flight sanity limit. Otherwise the request receives HTTP 422 and no probability is calculated. The 15-hour limit accommodates long Alaska/Hawaii itineraries and is not a route-duration model.
-
-Connection layover calculation remains local to the connection airport and retains the existing deterministic rollover rule: a reversed connection time is next-day only when arrival is at or after 18:00 and connecting departure is at or before 12:00. Layovers must be at least the boarding cutoff and no more than 12 hours.
-
-Airport metadata comes from the pinned `airportsdata==20260803` package, whose MIT-licensed offline database maps IATA codes to IANA timezone names. Supported domestic jurisdictions are the United States, Puerto Rico, U.S. Virgin Islands, Guam, American Samoa, and Northern Mariana Islands. Unknown or unsupported airports are rejected rather than guessed. This validation does not change the frozen V1 delay estimator, cohort hierarchy, 24-month lookback, Monte Carlo simulation, or transfer-time assumptions.
-
-## Tests
+From the repository root:
 
 ```powershell
 .venv\Scripts\python -m pytest -q
 ```
 
-Tests use clearly labeled synthetic unit fixtures. They cover same-day and overnight connections, cross-timezone chronology, Phoenix's non-DST timezone, a DST transition, unknown airports, excessive durations, invalid airport codes, ambiguous reversed connection times, fallback and empty-history behavior, canonical SHA-256 seed stability across processes, deterministic service/API responses, API response shape, and probability bounds.
-
-Run frontend interaction tests, lint, and the production build from `frontend/`:
+From `frontend/`:
 
 ```powershell
 npm test
 npm run lint
+npx tsc --noEmit
 npm run build
 ```
 
-## Production preparation
+## Repository Structure
 
-The recommended public architecture is a Vercel-hosted Next.js frontend and a Railway-hosted backend built from the repository Dockerfile. During image build, the Dockerfile downloads the exact versioned serving DuckDB from the public `v1-data` GitHub Release and fails unless its SHA-256 matches. It never downloads or rebuilds raw BTS data at application startup, and the DuckDB remains absent from Git.
-
-Build the exact production database:
-
-```powershell
-.venv\Scripts\python -m backend.flight_connection.production_database `
-  --source data\processed\flights_full.duckdb `
-  --destination data\production\flights_production.duckdb
+```text
+backend/    FastAPI service, empirical estimator, simulator, data pipeline
+frontend/   Next.js application and frontend tests
+data/       Git-ignored raw, processed, and production data locations
+docs/       Data lineage, methodology, validation, and deployment reports
+scripts/    Reproducible analysis, artifact-generation, and smoke-test commands
+tests/      Backend unit and integration tests
+examples/   Example API request payloads
 ```
 
-Verify frozen-V1 equivalence:
+Deployment configuration, environment variables, the checksum-verified database build, and the public smoke-test procedure are documented in [docs/deployment.md](docs/deployment.md).
 
-```powershell
-.venv\Scripts\python -m scripts.compare_production_database --cases 50 --seed 20260810
-```
+## Version
 
-The current serving artifact is 113,782,784 bytes rather than 712,519,680 bytes for the full research database. It retains all rows, preserves `flight_date` for strict temporal filtering, and removes only columns V1 never queries. The completed 50-case fixed-seed comparison had zero probability, scenario, quantile, cohort, or sample-size differences.
+**Current stable version: V1**
 
-See [the deployment guide](docs/deployment.md) for the artifact boundaries, platform tradeoffs, checksum-verified container build, environment variables, costs and limitations, GitHub, Vercel and Railway steps, and production smoke test.
-
-See [the frozen V1 serving alignment report](docs/serving_alignment.md) for strict 24-month semantics, historical coverage metadata, production/full equivalence, and the repeated 2024/2025 holdout results.
-
-## Current assumptions and limitations
-
-- Only completed, non-diverted BTS flights inform arrival delay. Cancellation and diversion probability is not modeled.
-- Deplaning and gate-transfer times are generic assumptions, not measured airport-specific data. They do not model terminals, gates, aircraft, seat position, mobility, checked bags, or security re-screening.
-- The boarding cutoff is configurable but is not a universal airline policy.
-- The API uses reporting carrier, not marketing carrier.
-- Airport-local timezone conversion validates only the scheduled chronology of the first flight; it does not add schedule data or alter probability estimation. Ambiguous local times during the autumn DST fold use Python `zoneinfo`'s default first occurrence because the request has no UTC offset or fold indicator.
-- Frozen V1 uses only strictly prior observations from the previous 24 calendar months. Available BTS history currently spans 2023-01-01 through 2025-12-31; later predictions do not fabricate newer observations and return a freshness warning when the coverage gap exceeds 90 days.
-- The development database is deterministically stratified; model validation should still use the full database or an explicitly designed evaluation sample.
-- Estimates do not yet include confidence intervals or model calibration results.
-- Production requires an explicit HTTPS `NEXT_PUBLIC_API_BASE_URL`, database path, and exact CORS allowlist.
-
-## Intentionally not implemented
-
-The MVP has no authentication, accounts, payments, notifications, live public deployment, weather, FAA status, real-time tracking, flight-number lookup, schedule API, or airport-specific transfer-time database.
-
-The next milestone is building and publishing the prepared backend image from a Docker-capable machine, then following the deployment guide to obtain the two public HTTPS URLs. The empirical estimator and public API response remain unchanged.
+The V1 probability model and assumptions are frozen. No `v1.0.0` Git tag is claimed by this README.
