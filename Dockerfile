@@ -28,6 +28,7 @@ RUN pip install --no-cache-dir --requirement requirements-runtime.txt
 COPY backend/flight_connection/__init__.py ./backend/flight_connection/__init__.py
 COPY backend/flight_connection/api.py ./backend/flight_connection/api.py
 COPY backend/flight_connection/service.py ./backend/flight_connection/service.py
+COPY backend/flight_connection/deterministic_seed.py ./backend/flight_connection/deterministic_seed.py
 COPY backend/flight_connection/timezone_validation.py ./backend/flight_connection/timezone_validation.py
 COPY backend/flight_connection/schemas.py ./backend/flight_connection/schemas.py
 COPY backend/flight_connection/delay_model.py ./backend/flight_connection/delay_model.py
