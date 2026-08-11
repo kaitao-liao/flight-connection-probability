@@ -10,7 +10,12 @@ import duckdb
 from .delay_model import historical_delay_distribution
 from .deterministic_seed import MODEL_VERSION, deterministic_itinerary_seed
 from .schemas import ConnectionRiskRequest, ConnectionRiskResponse
-from .simulator import TransferTimeAssumption, simulate_connection
+from .simulator import (
+    DEFAULT_BOARDING_CUTOFF_MINUTES,
+    DEFAULT_DEPLANING_MINUTES,
+    TransferTimeAssumption,
+    simulate_connection,
+)
 from .timezone_validation import first_flight_duration_minutes, validate_supported_airports
 
 LOGGER = logging.getLogger("flight_connection.service")
@@ -42,12 +47,14 @@ def elapsed_minutes(start: time, end: time, *, label: str) -> tuple[int, bool]:
 class ConnectionRiskService:
     def __init__(
         self, database: str | Path, *, simulations: int = 20_000,
-        boarding_cutoff_minutes: float = 15.0,
+        deplaning_minutes: float = DEFAULT_DEPLANING_MINUTES,
+        boarding_cutoff_minutes: float = DEFAULT_BOARDING_CUTOFF_MINUTES,
         transfer: TransferTimeAssumption = TransferTimeAssumption(),
         min_observations: int = 30, seed: int | None = None,
     ) -> None:
         self.database = Path(database)
         self.simulations = simulations
+        self.deplaning_minutes = deplaning_minutes
         self.boarding_cutoff_minutes = boarding_cutoff_minutes
         self.transfer = transfer
         self.min_observations = min_observations
@@ -120,6 +127,7 @@ class ConnectionRiskService:
             distribution.samples_minutes,
             layover_minutes=layover,
             simulations=self.simulations,
+            deplaning_minutes=self.deplaning_minutes,
             boarding_cutoff_minutes=self.boarding_cutoff_minutes,
             transfer=self.transfer,
             seed=simulation_seed,
@@ -159,6 +167,10 @@ class ConnectionRiskService:
             model={
                 "cohort_level": distribution.fallback_level,
                 "arrival_delay_evidence": "observed_completed_non_diverted_BTS_flights",
+                "deplaning_time": {
+                    "fixed_minutes": self.deplaning_minutes,
+                    "evidence_type": "modeling_assumption",
+                },
                 "transfer_time": {
                     "distribution": "triangular",
                     "minimum_minutes": self.transfer.minimum,

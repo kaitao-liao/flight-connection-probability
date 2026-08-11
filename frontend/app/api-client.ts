@@ -29,6 +29,10 @@ export type ConnectionRiskResponse = {
     version: string;
     cohort_level: string;
     arrival_delay_evidence: string;
+    deplaning_time: {
+      fixed_minutes: number;
+      evidence_type: string;
+    };
     transfer_time: {
       distribution: string;
       minimum_minutes: number;

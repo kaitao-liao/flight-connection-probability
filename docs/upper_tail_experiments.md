@@ -1,5 +1,7 @@
 # Upper-tail modeling experiments
 
+> Historical note: connection-calibration results in this report predate the revised V1 passenger-time assumptions and used the earlier transfer-only model. The empirical arrival-delay tail findings remain applicable; the connection metrics do not validate current V1's 20-minute deplaning plus Triangular(15,25,40) gate-transfer model.
+
 ## Decision status
 
 This report evaluates experimental estimators. The production estimator, public API, transfer-time assumptions, and frontend were not changed. No candidate is promoted automatically.
@@ -240,4 +242,3 @@ The project can proceed to a clearly labeled experimental frontend, but the prob
 - Synthetic connections and assumed transfer times are model-consistency validation, not passenger observations.
 - Cluster bootstrap intervals remain conditional on this sampling design.
 - No weather, FAA, gate, or real-time data is used.
-

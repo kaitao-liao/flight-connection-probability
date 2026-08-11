@@ -101,7 +101,7 @@ function ResultPanel({ result }: { result: ConnectionRiskResponse }) {
       <section className="scenario-card" aria-labelledby="scenario-title">
         <div className="section-heading">
           <div><p className="eyebrow">Sensitivity check</p><h3 id="scenario-title">First-flight arrival scenarios</h3></div>
-          <p>How a fixed arrival delay changes the simulated probability.</p>
+          <p>Probability conditional on the first flight arriving at each fixed delay; passenger transfer time is still simulated.</p>
         </div>
         <div className="scenario-list">
           {(Object.keys(result.scenarios) as Array<keyof typeof result.scenarios>).map((key) => {
@@ -117,14 +117,15 @@ function ResultPanel({ result }: { result: ConnectionRiskResponse }) {
       <details className="method-card">
         <summary>How this estimate was generated</summary>
         <div className="method-content">
-          <p>The arrival-delay distribution comes from observed BTS flights in the selected historical cohort. Transfer time and boarding cutoff are explicit simulation assumptions—not measured airport-specific data.</p>
+          <p>The arrival-delay distribution comes from observed BTS flights in the selected historical cohort. Deplaning, gate transfer, and boarding cutoff are V1 assumptions—not measured passenger-movement data.</p>
           <dl>
             <div><dt>Model version</dt><dd>{result.model.version}</dd></div>
             <div><dt>Historical cohort</dt><dd>{result.model.cohort_level}</dd></div>
             <div><dt>Historical window</dt><dd>Previous {result.model.historical_coverage.lookback_months} months; records strictly before {result.model.historical_coverage.strict_cutoff_exclusive}</dd></div>
             <div><dt>Available BTS coverage</dt><dd>{result.model.historical_coverage.available_start_date} through {result.model.historical_coverage.available_end_date}</dd></div>
             <div><dt>Effective history</dt><dd>{result.model.historical_coverage.effective_history_start_date} through {result.model.historical_coverage.effective_history_end_date}</dd></div>
-            <div><dt>Transfer-time assumption</dt><dd>Triangular: {result.model.transfer_time.minimum_minutes} / {result.model.transfer_time.mode_minutes} / {result.model.transfer_time.maximum_minutes} min (min / mode / max)</dd></div>
+            <div><dt>Deplaning assumption</dt><dd>{result.model.deplaning_time.fixed_minutes} min fixed</dd></div>
+            <div><dt>Gate-transfer assumption</dt><dd>Triangular: {result.model.transfer_time.minimum_minutes} / {result.model.transfer_time.mode_minutes} / {result.model.transfer_time.maximum_minutes} min (min / mode / max)</dd></div>
             <div><dt>Boarding cutoff</dt><dd>{result.model.boarding_cutoff_minutes} min before departure</dd></div>
             <div><dt>Simulations</dt><dd>{result.model.simulation_count.toLocaleString()}</dd></div>
             <div><dt>Excluded events</dt><dd>{result.model.exclusions.join(", ")}</dd></div>

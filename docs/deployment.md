@@ -1,6 +1,6 @@
 # Deployment guide
 
-This guide prepares the frozen V1 application for public HTTPS access. It does not change the transfer-time assumption, boarding cutoff, or core probability fields. The response model includes temporal coverage metadata required for transparent serving.
+This guide prepares V1 for public HTTPS access without changing its modeling code. Current V1 explicitly exposes the 20-minute deplaning assumption, Triangular(15,25,40) gate-transfer assumption, 15-minute boarding cutoff, and temporal coverage metadata required for transparent serving.
 
 The earlier serving/validation lookback mismatch has been resolved. See [the serving alignment report](serving_alignment.md) for the shared temporal implementation, boundaries, rebuilt database, exact equivalence results, and 2024/2025 revalidation.
 

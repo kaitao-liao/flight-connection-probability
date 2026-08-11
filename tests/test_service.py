@@ -1,4 +1,4 @@
-from datetime import date, time
+from datetime import date, datetime, time, timedelta
 
 import pytest
 
@@ -32,9 +32,9 @@ def test_same_day_connection(development_database):
     assert result.model.historical_coverage.strict_cutoff_exclusive == date(2026, 8, 20)
     assert "Historical BTS data ends" in result.model.historical_coverage.freshness_warning
     # Frozen seeded regression: timezone chronology validation must not alter V1 simulation output.
-    assert result.connection_probability == 1.0
+    assert result.connection_probability == 0.832
     assert result.scenarios.model_dump() == {
-        "on_time": 1.0, "delay_15": 1.0, "delay_30": 1.0, "delay_45": 0.732,
+        "on_time": 1.0, "delay_15": 0.94, "delay_30": 0.106, "delay_45": 0.0,
     }
 
 
@@ -85,13 +85,13 @@ def test_default_service_is_deterministic_per_itinerary(development_database):
 
 def test_relevant_changes_update_seed_and_probability(development_database):
     service = ConnectionRiskService(development_database, simulations=2_000)
-    baseline = service.estimate(itinerary(connecting_departure_time=time(18, 15)))
-    longer = service.estimate(itinerary(connecting_departure_time=time(18, 30)))
+    baseline = service.estimate(itinerary(connecting_departure_time=time(18, 45)))
+    longer = service.estimate(itinerary(connecting_departure_time=time(19)))
     carrier = service.estimate(itinerary(
-        carrier="AA", connecting_departure_time=time(18, 15),
+        carrier="AA", connecting_departure_time=time(18, 45),
     ))
     route = service.estimate(itinerary(
-        origin="BHM", connecting_departure_time=time(18, 15),
+        origin="BHM", connecting_departure_time=time(18, 45),
     ))
 
     assert longer.model.random_seed != baseline.model.random_seed
@@ -104,8 +104,11 @@ def test_relevant_changes_update_seed_and_probability(development_database):
 
 def test_layover_monotonicity_remains_for_representative_itinerary(development_database):
     service = ConnectionRiskService(development_database, simulations=20_000)
+    arrival = datetime.combine(date(2026, 8, 20), time(17, 45))
     probabilities = [
-        service.estimate(itinerary(connecting_departure_time=time(18, layover - 15))).connection_probability
-        for layover in (25, 30, 45, 60)
+        service.estimate(itinerary(
+            connecting_departure_time=(arrival + timedelta(minutes=layover)).time()
+        )).connection_probability
+        for layover in (20, 25, 30, 45, 60, 75, 90, 120)
     ]
     assert probabilities == sorted(probabilities)

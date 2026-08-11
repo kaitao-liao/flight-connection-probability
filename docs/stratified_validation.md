@@ -1,5 +1,7 @@
 # Larger stratified temporal validation study
 
+> Historical note: connection-calibration results in this report predate the revised V1 passenger-time assumptions and used the earlier transfer-only model. Arrival-delay and cohort findings remain applicable; connection calibration should be rerun before citing it for current V1.
+
 ## Diagnostic status
 
 This study diagnoses the existing model. It does not change the production estimator, API response, transfer-time assumption, or frontend. Results do not establish production readiness.
@@ -221,4 +223,3 @@ Modify and revalidate the modeling layer before presenting the probability as a 
 - validate cancellation/diversion probabilities separately before API integration.
 
 A frontend shell could be built as an engineering exercise, but the numerical result should remain clearly experimental until those modeling issues are addressed.
-

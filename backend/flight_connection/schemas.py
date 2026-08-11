@@ -63,6 +63,11 @@ class TransferTimeModel(BaseModel):
     evidence_type: Literal["modeling_assumption"]
 
 
+class DeplaningTimeModel(BaseModel):
+    fixed_minutes: float
+    evidence_type: Literal["modeling_assumption"]
+
+
 class HistoricalCoverageDetails(BaseModel):
     lookback_months: Literal[24] = 24
     available_start_date: date
@@ -78,6 +83,7 @@ class ModelDetails(BaseModel):
     version: Literal["v1"] = "v1"
     cohort_level: str
     arrival_delay_evidence: Literal["observed_completed_non_diverted_BTS_flights"]
+    deplaning_time: DeplaningTimeModel
     transfer_time: TransferTimeModel
     boarding_cutoff_minutes: float
     simulation_count: int

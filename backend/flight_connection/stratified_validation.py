@@ -13,7 +13,12 @@ from typing import Callable
 import duckdb
 import numpy as np
 
-from .simulator import TransferTimeAssumption, simulate_connection
+from .simulator import (
+    DEFAULT_BOARDING_CUTOFF_MINUTES,
+    DEFAULT_DEPLANING_MINUTES,
+    TransferTimeAssumption,
+    simulate_connection,
+)
 from .validation import (
     TemporalHistory, ValidationCase, empirical_crps, select_temporal_distribution,
     status_probabilities, temporal_cohort_samples,
@@ -273,7 +278,11 @@ def evaluate_connections(
         status = status_probabilities(database, case=case, history=history)
         combined = status["completion_probability"] * conditional
         transfer_minutes = rng.triangular(transfer.minimum, transfer.mode, transfer.maximum)
-        outcome = float(weighted_case.status == "completed" and case.realized_delay + transfer_minutes <= layover - 15)
+        outcome = float(
+            weighted_case.status == "completed"
+            and case.realized_delay + DEFAULT_DEPLANING_MINUTES + transfer_minutes
+            + DEFAULT_BOARDING_CUTOFF_MINUTES <= layover
+        )
         rows.append({
             "prediction_date": str(case.flight_date), "carrier": case.carrier, "origin": case.origin,
             "connection": case.destination, "destination": final_destination,

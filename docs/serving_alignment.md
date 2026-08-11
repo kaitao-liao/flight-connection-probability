@@ -9,7 +9,7 @@ The public API now serves the validated frozen V1 strategy:
 - strict exclusive upper bound: `flight_date < prediction_date`;
 - minimum cohort size 30;
 - unchanged empirical cohort hierarchy;
-- unchanged empirical delay sampling, Monte Carlo simulator, boarding cutoff, and transfer-time assumption.
+- unchanged empirical delay sampling, temporal cohort selection, and Monte Carlo method. Passenger-time assumptions were subsequently revised to explicit 20-minute deplaning, Triangular(15,25,40) gate transfer, and the existing 15-minute boarding cutoff; earlier connection metrics in this document predate that revision.
 
 Serving and validation call `temporal_delay_cohorts` in `delay_model.py`. There is no separate production implementation of temporal cohort selection.
 

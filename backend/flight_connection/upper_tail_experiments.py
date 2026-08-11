@@ -15,7 +15,12 @@ import numpy as np
 
 from .acquire import time_bucket
 from .delay_model import COHORT_LEVELS, DelayDistribution
-from .simulator import TransferTimeAssumption, simulate_connection
+from .simulator import (
+    DEFAULT_BOARDING_CUTOFF_MINUTES,
+    DEFAULT_DEPLANING_MINUTES,
+    TransferTimeAssumption,
+    simulate_connection,
+)
 from .stratified_validation import (
     SEED, WeightedCase, stratified_cases, weighted_brier, weighted_calibration_bins,
     weighted_ece, weighted_mean, weighted_pinball,
@@ -296,7 +301,11 @@ def evaluate_connections(
         distributions = candidate_distributions(store, item.case)
         layover, final_destination = _schedule(store, item.case, SEED + index)
         transfer_minutes = rng.triangular(transfer.minimum, transfer.mode, transfer.maximum)
-        outcome = float(item.status == "completed" and item.case.realized_delay + transfer_minutes <= layover - 15)
+        outcome = float(
+            item.status == "completed"
+            and item.case.realized_delay + DEFAULT_DEPLANING_MINUTES + transfer_minutes
+            + DEFAULT_BOARDING_CUTOFF_MINUTES <= layover
+        )
         for candidate, distribution in distributions.items():
             probability = simulate_connection(
                 distribution.samples_minutes, layover_minutes=layover, simulations=simulations,

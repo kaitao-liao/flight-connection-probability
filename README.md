@@ -170,11 +170,15 @@ Representative response shape (values depend on the local BTS subset):
     "version": "v1",
     "cohort_level": "route_carrier_month_bucket",
     "arrival_delay_evidence": "observed_completed_non_diverted_BTS_flights",
+    "deplaning_time": {
+      "fixed_minutes": 20.0,
+      "evidence_type": "modeling_assumption"
+    },
     "transfer_time": {
       "distribution": "triangular",
-      "minimum_minutes": 10.0,
-      "mode_minutes": 20.0,
-      "maximum_minutes": 35.0,
+      "minimum_minutes": 15.0,
+      "mode_minutes": 25.0,
+      "maximum_minutes": 40.0,
       "evidence_type": "modeling_assumption"
     },
     "boarding_cutoff_minutes": 15.0,
@@ -211,17 +215,17 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/connection-risk
 
 Frozen V1 first restricts history to `flight_date >= travel_date - 24 calendar months` and `flight_date < travel_date`. It then searches these cohorts until it finds the configured minimum number of observations (default 30): exact carrier/route/month/day-of-week/time bucket; carrier/route/month/time bucket; carrier/route/adjacent-month season; carrier/route; route; carrier; global. Serving and validation use the same temporal cohort-query implementation. The response exposes the selected level, observation count, effective history, available BTS coverage, and any freshness warning.
 
-The simulator resamples the selected observed arrival delays. Separately, it samples transfer time from a triangular **modeling assumption** of 10/20/35 minutes (minimum/mode/maximum). Success means:
+The simulator resamples the selected observed arrival delays. Connection probability combines that empirical distribution with V1 passenger-transfer assumptions: 20 fixed minutes for deplaning, a triangular 15/25/40-minute gate-to-gate transfer distribution (minimum/mode/maximum), and a 15-minute boarding cutoff. Success means:
 
-`arrival delay + transfer time <= scheduled layover - boarding cutoff`
+`arrival delay + deplaning time + gate-transfer time + boarding cutoff <= scheduled layover`
 
-The boarding cutoff defaults to 15 minutes. Scenario probabilities hold arrival delay fixed at 0, 15, 30, or 45 minutes while sampling transfer time.
+All passenger-time values are explicit V1 modeling assumptions, not BTS-observed passenger movement data. Scenario probabilities hold arrival delay fixed at 0, 15, 30, or 45 minutes while sampling gate-to-gate transfer time. The theoretical minimum passenger requirement before arrival delay is 50 minutes; its mode is 60 minutes and maximum is 75 minutes.
 
 The product deliberately returns a quantitative probability rather than mapping it to a qualitative risk category.
 
 Production V1 uses deterministic per-itinerary Monte Carlo seeding. The backend normalizes the model version, carrier, three airports, travel date, and all three scheduled times into canonical JSON, computes SHA-256, and interprets the first eight digest bytes as an unsigned 64-bit seed. Therefore the same canonical itinerary and model version produce the same 20,000 simulation draws and exactly the same response across repeated requests and process restarts. Changing any of those fields changes the seed. The seed remains response metadata for debugging; clients should not treat its numeric value as a business input.
 
-This removes user-visible rerun noise without changing the empirical delay distribution, cohort hierarchy, 24-month lookback, transfer-time distribution, boarding cutoff, or simulation count. Explicit `ConnectionRiskService(seed=...)` overrides remain available for research validation and unit tests.
+This removes user-visible rerun noise without changing the empirical delay distribution, cohort hierarchy, 24-month lookback, or simulation count. Explicit `ConnectionRiskService(seed=...)` overrides remain available for research validation and unit tests.
 
 ## Time validation
 
@@ -276,7 +280,7 @@ See [the frozen V1 serving alignment report](docs/serving_alignment.md) for stri
 ## Current assumptions and limitations
 
 - Only completed, non-diverted BTS flights inform arrival delay. Cancellation and diversion probability is not modeled.
-- Transfer time is a generic assumption, not measured airport-specific data. It does not model terminals, gates, mobility, checked bags, or security re-screening.
+- Deplaning and gate-transfer times are generic assumptions, not measured airport-specific data. They do not model terminals, gates, aircraft, seat position, mobility, checked bags, or security re-screening.
 - The boarding cutoff is configurable but is not a universal airline policy.
 - The API uses reporting carrier, not marketing carrier.
 - Airport-local timezone conversion validates only the scheduled chronology of the first flight; it does not add schedule data or alter probability estimation. Ambiguous local times during the autumn DST fold use Python `zoneinfo`'s default first occurrence because the request has no UTC offset or fold indicator.

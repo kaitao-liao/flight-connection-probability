@@ -29,7 +29,15 @@ def test_response_schema_and_probability_bounds(development_database):
     assert 0 <= body["connection_probability"] <= 1
     assert all(0 <= probability <= 1 for probability in body["scenarios"].values())
     assert body["model"]["arrival_delay_evidence"] == "observed_completed_non_diverted_BTS_flights"
+    assert body["model"]["deplaning_time"] == {
+        "fixed_minutes": 20.0, "evidence_type": "modeling_assumption",
+    }
     assert body["model"]["transfer_time"]["evidence_type"] == "modeling_assumption"
+    assert body["model"]["transfer_time"] == {
+        "distribution": "triangular", "minimum_minutes": 15.0,
+        "mode_minutes": 25.0, "maximum_minutes": 40.0,
+        "evidence_type": "modeling_assumption",
+    }
 
 
 def test_invalid_airport_code_returns_422(development_database):

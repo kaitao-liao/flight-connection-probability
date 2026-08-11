@@ -17,7 +17,12 @@ from .delay_model import (
     COHORT_LEVELS, DelayDistribution, TemporalHistory, select_temporal_distribution,
     subtract_months, temporal_delay_cohorts,
 )
-from .simulator import TransferTimeAssumption, simulate_connection
+from .simulator import (
+    DEFAULT_BOARDING_CUTOFF_MINUTES,
+    DEFAULT_DEPLANING_MINUTES,
+    TransferTimeAssumption,
+    simulate_connection,
+)
 
 
 @dataclass(frozen=True)
@@ -275,7 +280,10 @@ def run_validation(
             status = status_probabilities(database, case=case, history=history)
             combined = status["completion_probability"] * simulation.probability
             realized_transfer = rng.triangular(transfer.minimum, transfer.mode, transfer.maximum)
-            conditional_success = case.realized_delay + realized_transfer <= layover - 15
+            conditional_success = (
+                case.realized_delay + DEFAULT_DEPLANING_MINUTES + realized_transfer
+                + DEFAULT_BOARDING_CUTOFF_MINUTES <= layover
+            )
             realized = float(actually_completed and conditional_success)
             probabilities.append(combined)
             conditional_probabilities.append(simulation.probability)

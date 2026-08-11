@@ -126,7 +126,7 @@ The prototype is `P(original itinerary succeeds) = P(inbound completed) × P(mak
 
 ## Connection-probability model-consistency replay
 
-The replay pairs an inbound with a same-date outbound schedule from the connection airport where available, with a deterministic 45–180 minute fallback otherwise. Predicted conditional probability uses the existing simulator. A fixed-seed transfer time is sampled from the unchanged triangular 10/20/35-minute assumption. Realized outcome is failure for cancelled/diverted inbound, or historical arrival delay plus assumed transfer time for completed inbound.
+The replay pairs an inbound with a same-date outbound schedule from the connection airport where available, with a deterministic 45–180 minute fallback otherwise. This historical validation predates the revised passenger-time model and used the then-current triangular 10/20/35-minute transfer assumption without explicit deplaning. Its connection-calibration metrics must not be presented as validation of current production V1. Current V1 uses 20 fixed deplaning minutes, Triangular(15,25,40) gate-transfer minutes, and a 15-minute boarding cutoff; a future validation should rerun connection calibration under those assumptions. Arrival-delay metrics in this report are unaffected.
 
 This is not passenger-level validation because BTS does not observe gates, passenger walking time, boarding, reaccommodation, or whether a passenger attempted the connection.
 
@@ -158,4 +158,3 @@ Calibration-bin data suitable for reliability diagrams is stored in the JSON rep
 - Transfer time is assumed, so connection calibration is a model-consistency diagnostic.
 - No weather, airport layout, gate, reaccommodation, or real-time information is modeled.
 - The model is not production-ready.
-

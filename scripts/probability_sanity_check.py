@@ -28,7 +28,7 @@ from backend.flight_connection.simulator import simulate_connection
 DATABASE = Path("data/production/flights_production.duckdb")
 PREDICTION_DATE = date(2025, 7, 15)
 SIMULATIONS = 20_000
-LAYOVERS = (25, 30, 45, 60, 90, 120)
+LAYOVERS = (20, 25, 30, 45, 60, 75, 90, 120)
 ROUTES = {
     "AA": ("LAX", "DFW"),
     "DL": ("MCO", "ATL"),
@@ -114,6 +114,9 @@ def main() -> None:
             "database": str(DATABASE),
             "prediction_date": PREDICTION_DATE.isoformat(),
             "simulations_per_estimate": SIMULATIONS,
+            "deplaning_minutes": 20,
+            "gate_transfer_triangular_minutes": [15, 25, 40],
+            "boarding_cutoff_minutes": 15,
             "fixed_seed_for_comparisons": 20260811,
             "production_seed_strategy": "sha256_canonical_itinerary",
         }
@@ -127,9 +130,9 @@ def main() -> None:
         {
             "layover_minutes": layover,
             **simulated_summary(baseline, layover),
-            "deadline_after_boarding_cutoff_minutes": layover - 15,
+            "gate_transfer_deadline_after_deplaning_and_cutoff_minutes": layover - 20 - 15,
         }
-        for layover in (20, 25, 30)
+        for layover in (30, 45, 60)
     ]
     results["short_layover_delay_evidence"] = {
         "quantiles": baseline.quantiles(),
