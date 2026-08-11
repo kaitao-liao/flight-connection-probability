@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConnectionRiskCalculator, formatDelay } from "../app/connection-risk-calculator";
@@ -145,6 +145,7 @@ describe("ConnectionRiskCalculator", () => {
     await user.clear(screen.getByLabelText("Origin airport"));
     await user.click(screen.getByRole("button", { name: /calculate connection probability/i }));
     expect(await screen.findByText("Select a supported airport from the list.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText("Origin airport")).toHaveFocus());
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -202,7 +203,10 @@ describe("ConnectionRiskCalculator", () => {
     expect(screen.getByText("2 min early")).toBeInTheDocument();
     expect(screen.getByText("96.0%")).toBeInTheDocument();
     expect(screen.getByText("29.0%")).toBeInTheDocument();
-    expect(screen.getByText("Historical data coverage notice.")).toBeInTheDocument();
+    expect(screen.getByText("Historical data only — not live flight data.")).toBeInTheDocument();
+    expect(screen.getByText(/uses BTS performance records only through 2025-12-31/)).toBeInTheDocument();
+    expect(screen.getByText(/Each value assumes the first flight arrives exactly on time/)).toBeInTheDocument();
+    expect(screen.getByText(/historical BTS arrival performance and explicit V1 passenger-time assumptions/i)).toBeInTheDocument();
     expect(screen.queryByText(/low risk|moderate risk|high risk/i)).not.toBeInTheDocument();
     const request = vi.mocked(fetch).mock.calls[0];
     expect(request[0]).toContain("/api/v1/connection-risk");
@@ -246,6 +250,36 @@ describe("ConnectionRiskCalculator", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("not valid after accounting for the airports' local time zones");
     expect(screen.queryByRole("heading", { name: "Probability of making the connection" })).not.toBeInTheDocument();
+    expect(screen.getByText("Your estimate will appear here")).toBeInTheDocument();
+  });
+
+  it("clears a completed result as soon as an itinerary field changes", async () => {
+    mockJson(response);
+    render(<ConnectionRiskCalculator />);
+    const user = await validSubmission();
+    expect(await screen.findByText("78.2", { exact: false })).toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText("Connecting departure"));
+
+    expect(screen.queryByRole("heading", { name: "Probability of making the connection" })).not.toBeInTheDocument();
+    expect(screen.getByText("Your estimate will appear here")).toBeInTheDocument();
+  });
+
+  it("ignores a stale response after the itinerary changes during calculation", async () => {
+    let resolve!: (value: unknown) => void;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise((done) => { resolve = done; })));
+    render(<ConnectionRiskCalculator />);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Travel date"), "2026-08-20");
+    await user.click(screen.getByRole("button", { name: /calculate connection probability/i }));
+    expect(await screen.findByRole("button", { name: /calculating probability/i })).toBeDisabled();
+
+    await user.clear(screen.getByLabelText("Connecting departure"));
+    await user.type(screen.getByLabelText("Connecting departure"), "20:00");
+    resolve({ ok: true, status: 200, json: async () => response });
+
+    expect(screen.getByRole("button", { name: /calculate connection probability/i })).toBeEnabled();
+    expect(screen.queryByText("78.2", { exact: false })).not.toBeInTheDocument();
     expect(screen.getByText("Your estimate will appear here")).toBeInTheDocument();
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import {
   ApiError,
   ConnectionRiskResponse,
@@ -73,6 +73,7 @@ function ResultPanel({ result }: { result: ConnectionRiskResponse }) {
         <div>
           <p className="eyebrow">Estimated result</p>
           <h2 id="result-title">Probability of making the connection</h2>
+          <p className="result-context">Estimated from historical BTS arrival performance and explicit V1 passenger-time assumptions.</p>
         </div>
         <div className="probability" aria-label={`${probability} percent`}>{probability}<span>%</span></div>
       </div>
@@ -85,8 +86,8 @@ function ResultPanel({ result }: { result: ConnectionRiskResponse }) {
 
       {result.model.historical_coverage.freshness_warning && (
         <div className="warning" role="status">
-          <strong>Historical data coverage notice.</strong>{" "}
-          {result.model.historical_coverage.freshness_warning}
+          <strong>Historical data only — not live flight data.</strong>{" "}
+          This {result.model.historical_coverage.requested_prediction_date} estimate uses BTS performance records only through {result.model.historical_coverage.available_end_date}.
         </div>
       )}
 
@@ -101,7 +102,7 @@ function ResultPanel({ result }: { result: ConnectionRiskResponse }) {
       <section className="scenario-card" aria-labelledby="scenario-title">
         <div className="section-heading">
           <div><p className="eyebrow">Sensitivity check</p><h3 id="scenario-title">First-flight arrival scenarios</h3></div>
-          <p>Probability conditional on the first flight arriving at each fixed delay; passenger transfer time is still simulated.</p>
+          <p>Each value assumes the first flight arrives exactly on time or 15, 30, or 45 minutes late. Gate-to-gate transfer time is still simulated, so probabilities can change sharply.</p>
         </div>
         <div className="scenario-list">
           {(Object.keys(result.scenarios) as Array<keyof typeof result.scenarios>).map((key) => {
@@ -142,8 +143,14 @@ export function ConnectionRiskCalculator() {
   const [result, setResult] = useState<ConnectionRiskResponse | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const activeRequest = useRef<AbortController | null>(null);
 
   function update(key: keyof ItineraryRequest, value: string) {
+    activeRequest.current?.abort();
+    activeRequest.current = null;
+    setLoading(false);
+    setResult(null);
+    setApiError(null);
     setForm((current) => ({ ...current, [key]: value }));
     setErrors((current) => ({ ...current, [key]: undefined }));
   }
@@ -153,15 +160,29 @@ export function ConnectionRiskCalculator() {
     const nextErrors = validate(form);
     setErrors(nextErrors);
     setApiError(null);
-    if (Object.keys(nextErrors).length) return;
+    setResult(null);
+    if (Object.keys(nextErrors).length) {
+      requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+      });
+      return;
+    }
+    if (activeRequest.current) return;
+    const controller = new AbortController();
+    activeRequest.current = controller;
     setLoading(true);
     try {
-      setResult(await estimateConnectionRisk(form));
+      const nextResult = await estimateConnectionRisk(form, controller.signal);
+      if (activeRequest.current === controller) setResult(nextResult);
     } catch (error) {
-      setResult(null);
-      setApiError(error instanceof ApiError ? error.message : "An unexpected error occurred.");
+      if (!(error instanceof DOMException && error.name === "AbortError") && activeRequest.current === controller) {
+        setApiError(error instanceof ApiError ? error.message : "An unexpected error occurred.");
+      }
     } finally {
-      setLoading(false);
+      if (activeRequest.current === controller) {
+        activeRequest.current = null;
+        setLoading(false);
+      }
     }
   }
 
@@ -172,14 +193,14 @@ export function ConnectionRiskCalculator() {
         <div className="hero-copy">
           <span className="badge">Experimental</span>
           <h1>Will I Make My Connection?</h1>
-          <p>Estimate a U.S. domestic connection using historical arrival delays and a transparent transfer-time simulation.</p>
+          <p>Estimate a U.S. domestic connection using historical BTS arrival performance and explicit passenger-time assumptions—not live flight status.</p>
         </div>
       </header>
 
       <div className="page-grid">
         <section className="form-card" aria-labelledby="itinerary-title">
           <div className="section-heading"><div><p className="eyebrow">Your itinerary</p><h2 id="itinerary-title">Flight details</h2></div><p>Enter each time in the local time zone of that airport.</p></div>
-          <form onSubmit={submit} noValidate>
+          <form onSubmit={submit} noValidate aria-busy={loading}>
             <div className="route-grid">
               {airportFields.map(({ key, label }) => (
                 <AirportCombobox

@@ -19,7 +19,7 @@ body { margin: 0; background: #f4f8fb; color: var(--ink); font-family: Inter, ui
 button, input { font: inherit; }
 main { min-height: 100vh; }
 
-.hero { color: white; padding: 22px max(24px, calc((100vw - 1180px) / 2)) 92px; min-height: 310px; background: radial-gradient(circle at 88% 10%, rgba(99, 196, 218, .25), transparent 30%), linear-gradient(135deg, #082f4e, #0d5674); position: relative; overflow: hidden; }
+.hero { color: white; padding: 22px max(24px, calc((100vw - 1180px) / 2)) 110px; min-height: 350px; background: radial-gradient(circle at 88% 10%, rgba(99, 196, 218, .25), transparent 30%), linear-gradient(135deg, #082f4e, #0d5674); position: relative; overflow: hidden; }
 .hero::after { content: ""; position: absolute; right: -120px; bottom: -160px; width: 500px; height: 270px; border: 1px solid rgba(255,255,255,.13); border-radius: 50%; transform: rotate(-11deg); box-shadow: 0 0 0 48px rgba(255,255,255,.035), 0 0 0 96px rgba(255,255,255,.025); }
 .brand { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; font-size: .82rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .9; }
 .wing-mark { width: 29px; height: 12px; display: inline-block; border-top: 2px solid #65c5d9; transform: skew(-32deg); position: relative; }
@@ -43,7 +43,8 @@ h1 { margin: 14px 0 10px; font-size: clamp(2.35rem, 5vw, 4.2rem); line-height: .
 .autocomplete input { padding-right: 38px; }
 .autocomplete-clear { position: absolute; z-index: 2; top: 7px; right: 6px; width: 32px; height: 32px; margin: 0; padding: 0; border-radius: 5px; background: transparent; color: var(--muted); font-size: 1.3rem; font-weight: 500; }
 .autocomplete-clear:hover:not(:disabled) { background: #e8f1f6; color: var(--navy); transform: none; }
-.autocomplete-options { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; width: 100%; max-height: 300px; overflow-y: auto; margin: 0; padding: 5px; list-style: none; border: 1px solid #b6c9d7; border-radius: 8px; background: var(--paper); box-shadow: 0 14px 30px rgba(16, 42, 67, .16); }
+.autocomplete-options { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; width: min(360px, calc(100vw - 40px)); min-width: 100%; max-height: 300px; overflow-y: auto; margin: 0; padding: 5px; list-style: none; border: 1px solid #b6c9d7; border-radius: 8px; background: var(--paper); box-shadow: 0 14px 30px rgba(16, 42, 67, .16); }
+.route-grid .autocomplete-field:last-child .autocomplete-options { left: auto; right: 0; }
 .autocomplete-options li { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 10px; border-radius: 5px; color: var(--ink); font-size: .75rem; font-weight: 500; line-height: 1.35; cursor: pointer; }
 .autocomplete-options li:hover, .autocomplete-options li.active { background: var(--sky); }
 .autocomplete-options li[aria-selected="true"] { color: var(--blue-dark); }
@@ -76,6 +77,7 @@ button:disabled { opacity: .72; cursor: wait; }
 .results { display: grid; gap: 16px; }
 .probability-card { padding: 26px; background: linear-gradient(135deg, #fff, #eef8fb); display: flex; align-items: center; justify-content: space-between; gap: 15px; }
 .probability-card h2 { font-family: Georgia, "Times New Roman", serif; font-size: 1.3rem; font-weight: 500; margin: 5px 0 0; max-width: 220px; }
+.result-context { max-width: 245px; margin: 9px 0 0; color: var(--muted); font-size: .72rem; line-height: 1.45; }
 .probability { font-family: Georgia, "Times New Roman", serif; color: var(--navy); font-size: 3.15rem; line-height: 1; letter-spacing: -.05em; }
 .probability span { font-size: 1.4rem; color: var(--blue); }
 .results > .warning { margin: 0; box-shadow: none; }
@@ -83,6 +85,7 @@ button:disabled { opacity: .72; cursor: wait; }
 .stat-grid article { min-height: 108px; padding: 18px 20px; display: flex; flex-direction: column; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .stat-grid article:nth-child(even) { border-right: 0; }
 .stat-grid article:last-child { border-bottom: 0; }
+.stat-grid article:last-child:nth-child(odd) { grid-column: 1 / -1; border-right: 0; }
 .stat-grid span { color: var(--muted); font-size: .72rem; }
 .stat-grid strong { margin-top: 7px; font-family: Georgia, "Times New Roman", serif; font-weight: 500; font-size: 1.22rem; }
 .stat-grid small { color: #7d8f9e; margin-top: auto; font-size: .66rem; }
@@ -96,6 +99,7 @@ button:disabled { opacity: .72; cursor: wait; }
 .bar span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), #64bfd0); }
 .method-card { overflow: hidden; }
 .method-card summary { cursor: pointer; list-style: none; padding: 20px 24px; font-weight: 800; font-size: .86rem; display: flex; justify-content: space-between; }
+.method-card summary:focus-visible { outline: 3px solid #68c4dc; outline-offset: -3px; }
 .method-card summary::after { content: "+"; color: var(--blue); font-size: 1.2rem; }
 .method-card[open] summary::after { content: "−"; }
 .method-content { border-top: 1px solid var(--line); padding: 20px 24px; color: var(--muted); font-size: .78rem; line-height: 1.55; }
@@ -110,8 +114,12 @@ dd { margin: 0; overflow-wrap: anywhere; }
   .page-grid { grid-template-columns: 1fr; }
   .empty-state { min-height: 280px; }
 }
+@media (max-width: 1080px) {
+  .page-grid { grid-template-columns: 1fr; }
+  .empty-state { min-height: 280px; }
+}
 @media (max-width: 600px) {
-  .hero { padding-inline: 20px; padding-bottom: 70px; min-height: 300px; }
+  .hero { padding-inline: 20px; padding-bottom: 105px; min-height: 340px; }
   .hero-copy { margin-top: 48px; }
   .page-grid { width: min(100% - 20px, 1180px); margin-top: -30px; }
   .form-card { padding: 22px 18px; }
@@ -124,6 +132,7 @@ dd { margin: 0; overflow-wrap: anywhere; }
   .probability { font-size: 3.8rem; }
   .stat-grid { grid-template-columns: 1fr; }
   .stat-grid article, .stat-grid article:nth-child(even) { border-right: 0; border-bottom: 1px solid var(--line); }
+  .stat-grid article:last-child:nth-child(odd) { grid-column: auto; }
   dl div { grid-template-columns: 1fr; gap: 3px; }
 }
 

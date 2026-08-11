@@ -127,7 +127,7 @@ export function CarrierCombobox({ id, label, value, error, onChange }: Props) {
                 <span>{carrier.name}</span>
                 <strong>{carrier.code}</strong>
               </li>
-            )) : <li className="autocomplete-no-results">No supported carriers found</li>}
+            )) : <li role="option" aria-selected="false" aria-disabled="true" className="autocomplete-no-results">No supported carriers found</li>}
           </ul>
         )}
       </div>

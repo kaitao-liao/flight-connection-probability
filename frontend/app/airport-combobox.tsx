@@ -116,7 +116,7 @@ export function AirportCombobox({ id, label, value, error, onChange }: Props) {
                 <span>{airport.city} — {airport.name}</span>
                 <strong>{airport.code}</strong>
               </li>
-            )) : <li className="autocomplete-no-results">No supported airports found</li>}
+            )) : <li role="option" aria-selected="false" aria-disabled="true" className="autocomplete-no-results">No supported airports found</li>}
           </ul>
         )}
       </div>
