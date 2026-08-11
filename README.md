@@ -24,7 +24,9 @@ An interpretable MVP API that estimates whether a passenger will make a U.S. dom
 
 - `frontend/app/connection-risk-calculator.tsx` owns the form state, client-side validation, loading/error states, and quantitative result presentation.
 - `frontend/app/airport-combobox.tsx` provides accessible, keyboard-navigable airport search by IATA code, city, or airport name.
+- `frontend/app/carrier-combobox.tsx` provides carrier-code and airline-name search while retaining only the reporting carrier code in form state.
 - `frontend/data/supported-airports.json` is a generated browser-sized list containing only airports present in BTS history with supported offline timezone metadata.
+- `frontend/data/supported-carriers.json` contains only reporting carriers present in the production BTS history.
 - `frontend/app/api-client.ts` is the typed HTTP boundary for `POST /api/v1/connection-risk`; it never substitutes mock results when the API fails.
 - `frontend/app/globals.css` provides the responsive, accessible card layout without a component framework.
 - `frontend/tests/connection-risk-calculator.test.tsx` covers normalization, validation, submission, loading, response formatting, scenarios, fallback warnings, disclaimers, and API errors.
@@ -36,12 +38,19 @@ Regenerate the supported-airport artifact after replacing the historical databas
 
 ```powershell
 .venv\Scripts\python scripts\generate_supported_airports.py
+.venv\Scripts\python scripts\generate_supported_carriers.py
 ```
 
 The generator takes the union of `origin` and `destination` codes in `historical_flights`, then
 intersects it with pinned `airportsdata` records that have an IATA code, an IANA timezone, and a
 U.S. or supported U.S.-territory country code. The committed JSON contains only `code`, `city`,
 and `name`; the full airport dataset is not shipped to the browser.
+
+The carrier generator reads distinct `reporting_carrier` values from the production
+`historical_flights` table and joins them to human-readable names from the official BTS Unique
+Carrier lookup. It fails if a production code has no maintained name instead of silently hiding
+the carrier. The browser artifact contains only `code` and `name`, and API requests continue to
+send the code alone.
 
 ## Setup and development data
 

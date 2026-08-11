@@ -38,17 +38,17 @@ h1 { margin: 14px 0 10px; font-size: clamp(2.35rem, 5vw, 4.2rem); line-height: .
 .eyebrow { margin: 0; color: var(--blue-dark); text-transform: uppercase; letter-spacing: .13em; font-size: .67rem; font-weight: 800; }
 .route-grid, .detail-grid, .time-grid { display: grid; gap: 16px; }
 .route-grid { grid-template-columns: repeat(3, 1fr); position: relative; }
-.airport-field { min-width: 0; display: flex; flex-direction: column; gap: 7px; }
-.airport-combobox { position: relative; }
-.airport-combobox input { padding-right: 38px; }
-.airport-clear { position: absolute; z-index: 2; top: 7px; right: 6px; width: 32px; height: 32px; margin: 0; padding: 0; border-radius: 5px; background: transparent; color: var(--muted); font-size: 1.3rem; font-weight: 500; }
-.airport-clear:hover:not(:disabled) { background: #e8f1f6; color: var(--navy); transform: none; }
-.airport-options { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; width: 100%; max-height: 300px; overflow-y: auto; margin: 0; padding: 5px; list-style: none; border: 1px solid #b6c9d7; border-radius: 8px; background: var(--paper); box-shadow: 0 14px 30px rgba(16, 42, 67, .16); }
-.airport-options li { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 10px; border-radius: 5px; color: var(--ink); font-size: .75rem; font-weight: 500; line-height: 1.35; cursor: pointer; }
-.airport-options li:hover, .airport-options li.active { background: var(--sky); }
-.airport-options li[aria-selected="true"] { color: var(--blue-dark); }
-.airport-options strong { flex: 0 0 auto; color: var(--blue-dark); letter-spacing: .04em; }
-.airport-options .airport-no-results { color: var(--muted); cursor: default; }
+.autocomplete-field { min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+.autocomplete { position: relative; }
+.autocomplete input { padding-right: 38px; }
+.autocomplete-clear { position: absolute; z-index: 2; top: 7px; right: 6px; width: 32px; height: 32px; margin: 0; padding: 0; border-radius: 5px; background: transparent; color: var(--muted); font-size: 1.3rem; font-weight: 500; }
+.autocomplete-clear:hover:not(:disabled) { background: #e8f1f6; color: var(--navy); transform: none; }
+.autocomplete-options { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; width: 100%; max-height: 300px; overflow-y: auto; margin: 0; padding: 5px; list-style: none; border: 1px solid #b6c9d7; border-radius: 8px; background: var(--paper); box-shadow: 0 14px 30px rgba(16, 42, 67, .16); }
+.autocomplete-options li { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 10px; border-radius: 5px; color: var(--ink); font-size: .75rem; font-weight: 500; line-height: 1.35; cursor: pointer; }
+.autocomplete-options li:hover, .autocomplete-options li.active { background: var(--sky); }
+.autocomplete-options li[aria-selected="true"] { color: var(--blue-dark); }
+.autocomplete-options strong { flex: 0 0 auto; color: var(--blue-dark); letter-spacing: .04em; }
+.autocomplete-options .autocomplete-no-results { color: var(--muted); cursor: default; }
 .detail-grid { grid-template-columns: 1fr 2fr; margin-top: 18px; }
 .time-grid { grid-template-columns: repeat(3, 1fr); padding-top: 22px; margin-top: 22px; border-top: 1px solid var(--line); }
 label { display: flex; flex-direction: column; gap: 7px; color: #294963; font-size: .77rem; font-weight: 750; letter-spacing: .01em; }
@@ -118,7 +118,7 @@ dd { margin: 0; overflow-wrap: anywhere; }
   .section-heading { display: block; }
   .section-heading > p { text-align: left; margin-top: 7px; }
   .route-grid, .time-grid { grid-template-columns: 1fr; }
-  .airport-options { max-height: 240px; }
+  .autocomplete-options { max-height: 240px; }
   .detail-grid { grid-template-columns: 1fr; }
   .probability-card { align-items: flex-start; flex-direction: column; }
   .probability { font-size: 3.8rem; }

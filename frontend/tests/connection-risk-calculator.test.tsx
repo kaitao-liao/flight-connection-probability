@@ -53,6 +53,16 @@ async function chooseAirport(
   return input;
 }
 
+async function chooseCarrier(
+  user: ReturnType<typeof userEvent.setup>, search: string, option: RegExp,
+) {
+  const input = screen.getByLabelText("Carrier");
+  await user.clear(input);
+  await user.type(input, search);
+  await user.click(await screen.findByRole("option", { name: option }));
+  return input;
+}
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe("ConnectionRiskCalculator", () => {
@@ -92,6 +102,40 @@ describe("ConnectionRiskCalculator", () => {
     expect(origin).toHaveAttribute("aria-expanded", "false");
   });
 
+  it("searches carriers by code and retains the selected airline", async () => {
+    const user = userEvent.setup();
+    render(<ConnectionRiskCalculator />);
+    const carrier = await chooseCarrier(user, "UA", /United Airlines.*UA/i);
+    expect(carrier).toHaveValue("United Airlines (UA)");
+  });
+
+  it("searches carriers by airline name and supports changing the selection", async () => {
+    const user = userEvent.setup();
+    render(<ConnectionRiskCalculator />);
+    const carrier = await chooseCarrier(user, "American", /American Airlines.*AA/i);
+    expect(carrier).toHaveValue("American Airlines (AA)");
+    await user.click(screen.getByRole("button", { name: "Clear Carrier" }));
+    expect(carrier).toHaveValue("");
+    await user.type(carrier, "Delta");
+    await user.click(await screen.findByRole("option", { name: /Delta Air Lines.*DL/i }));
+    expect(carrier).toHaveValue("Delta Air Lines (DL)");
+  });
+
+  it("supports carrier keyboard navigation, selection, and Escape", async () => {
+    const user = userEvent.setup();
+    render(<ConnectionRiskCalculator />);
+    const carrier = screen.getByLabelText("Carrier");
+    await user.clear(carrier);
+    await user.type(carrier, "United");
+    await user.keyboard("{ArrowDown}{ArrowUp}{ArrowDown}{Enter}");
+    expect(carrier).toHaveValue("United Airlines (UA)");
+    await user.tab();
+    await user.click(carrier);
+    expect(carrier).toHaveAttribute("aria-expanded", "true");
+    await user.keyboard("{Escape}");
+    expect(carrier).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("shows client-side validation and does not submit invalid input", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -117,6 +161,32 @@ describe("ConnectionRiskCalculator", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("does not submit unsupported arbitrary carrier text", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<ConnectionRiskCalculator />);
+    const carrier = screen.getByLabelText("Carrier");
+    await user.clear(carrier);
+    await user.type(carrier, "ZZ Unsupported Air");
+    expect(screen.getByText("No supported carriers found")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /calculate connection probability/i }));
+    expect(await screen.findByText("Select a supported carrier from the list.")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("sends only the selected carrier code to the backend", async () => {
+    mockJson(response);
+    const user = userEvent.setup();
+    render(<ConnectionRiskCalculator />);
+    await chooseCarrier(user, "American", /American Airlines.*AA/i);
+    await user.type(screen.getByLabelText("Travel date"), "2026-08-20");
+    await user.click(screen.getByRole("button", { name: /calculate connection probability/i }));
+    await screen.findByText("78.2", { exact: false });
+    const request = vi.mocked(fetch).mock.calls[0];
+    expect(JSON.parse(String((request[1] as RequestInit).body)).carrier).toBe("AA");
+  });
+
   it("submits normalized JSON, shows loading, and renders quantitative results", async () => {
     let resolve!: (value: unknown) => void;
     vi.stubGlobal("fetch", vi.fn(() => new Promise((done) => { resolve = done; })));
@@ -136,6 +206,7 @@ describe("ConnectionRiskCalculator", () => {
     const request = vi.mocked(fetch).mock.calls[0];
     expect(request[0]).toContain("/api/v1/connection-risk");
     expect(JSON.parse(String((request[1] as RequestInit).body)).origin).toBe("ATL");
+    expect(JSON.parse(String((request[1] as RequestInit).body)).carrier).toBe("DL");
   });
 
   it("shows a warning when the backend uses a broad fallback cohort", async () => {

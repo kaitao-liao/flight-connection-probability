@@ -8,6 +8,7 @@ import {
   ItineraryRequest,
 } from "./api-client";
 import { AirportCombobox, supportedAirportCodes } from "./airport-combobox";
+import { CarrierCombobox, supportedCarrierCodes } from "./carrier-combobox";
 
 type FormErrors = Partial<Record<keyof ItineraryRequest, string>>;
 
@@ -37,10 +38,6 @@ const scenarioLabels: Record<keyof ConnectionRiskResponse["scenarios"], string> 
 
 const broadFallbackCohorts = new Set(["route", "carrier", "global"]);
 
-export function normalizeCode(value: string, maxLength: number): string {
-  return value.replace(/[^a-z]/gi, "").toUpperCase().slice(0, maxLength);
-}
-
 export function formatDelay(value: number): string {
   if (value === 0) return "On time";
   const rounded = Math.round(Math.abs(value));
@@ -49,7 +46,7 @@ export function formatDelay(value: number): string {
 
 function validate(form: ItineraryRequest): FormErrors {
   const errors: FormErrors = {};
-  if (!/^[A-Z0-9]{2,3}$/.test(form.carrier)) errors.carrier = "Use a 2–3 character carrier code.";
+  if (!supportedCarrierCodes.has(form.carrier)) errors.carrier = "Select a supported carrier from the list.";
   for (const { key } of airportFields) {
     if (!supportedAirportCodes.has(form[key])) errors[key] = "Select a supported airport from the list.";
   }
@@ -146,8 +143,7 @@ export function ConnectionRiskCalculator() {
   const [loading, setLoading] = useState(false);
 
   function update(key: keyof ItineraryRequest, value: string) {
-    const normalized = key === "carrier" ? normalizeCode(value, 3) : value;
-    setForm((current) => ({ ...current, [key]: normalized }));
+    setForm((current) => ({ ...current, [key]: value }));
     setErrors((current) => ({ ...current, [key]: undefined }));
   }
 
@@ -196,7 +192,13 @@ export function ConnectionRiskCalculator() {
               ))}
             </div>
             <div className="detail-grid">
-              <label>Carrier<input aria-invalid={Boolean(errors.carrier)} aria-describedby="carrier-error" value={form.carrier} onChange={(e) => update("carrier", e.target.value)} placeholder="DL" autoComplete="off" /><FieldError id="carrier-error" message={errors.carrier} /></label>
+              <CarrierCombobox
+                id="carrier"
+                label="Carrier"
+                value={form.carrier}
+                error={errors.carrier}
+                onChange={(code) => update("carrier", code)}
+              />
               <label>Travel date<input type="date" aria-invalid={Boolean(errors.travel_date)} aria-describedby="date-error" value={form.travel_date} onChange={(e) => update("travel_date", e.target.value)} /><FieldError id="date-error" message={errors.travel_date} /></label>
             </div>
             <div className="time-grid">

@@ -1,17 +1,27 @@
 "use client";
 
 import { KeyboardEvent, useId, useMemo, useState } from "react";
-import airportData from "../data/supported-airports.json";
+import carrierData from "../data/supported-carriers.json";
 
-export type Airport = { code: string; city: string; name: string };
+export type Carrier = { code: string; name: string };
 
-export const supportedAirports = airportData as Airport[];
-export const supportedAirportCodes = new Set(supportedAirports.map((airport) => airport.code));
+export const supportedCarriers = carrierData as Carrier[];
+export const supportedCarrierCodes = new Set(supportedCarriers.map((carrier) => carrier.code));
 
-const MAX_RESULTS = 8;
+const MAX_RESULTS = 6;
 
-export function airportLabel(airport: Airport): string {
-  return `${airport.city} — ${airport.name} (${airport.code})`;
+export function carrierLabel(carrier: Carrier): string {
+  return `${carrier.name} (${carrier.code})`;
+}
+
+function matchRank(carrier: Carrier, term: string): number {
+  const code = carrier.code.toLocaleLowerCase();
+  const name = carrier.name.toLocaleLowerCase();
+  if (code === term) return 0;
+  if (code.startsWith(term)) return 1;
+  if (name.startsWith(term)) return 2;
+  if (name.split(/\s+/).some((word) => word.startsWith(term))) return 3;
+  return 4;
 }
 
 type Props = {
@@ -22,29 +32,30 @@ type Props = {
   onChange: (code: string) => void;
 };
 
-export function AirportCombobox({ id, label, value, error, onChange }: Props) {
+export function CarrierCombobox({ id, label, value, error, onChange }: Props) {
   const listboxId = `${id}-options`;
   const errorId = `${id}-error`;
   const instanceId = useId();
-  const selectedAirport = supportedAirports.find((airport) => airport.code === value);
-  const [query, setQuery] = useState(selectedAirport ? airportLabel(selectedAirport) : "");
+  const selectedCarrier = supportedCarriers.find((carrier) => carrier.code === value);
+  const [query, setQuery] = useState(selectedCarrier ? carrierLabel(selectedCarrier) : "");
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
 
   const matches = useMemo(() => {
     const term = query.trim().toLocaleLowerCase();
-    if (!term) return supportedAirports.slice(0, MAX_RESULTS);
-    return supportedAirports
-      .filter((airport) =>
-        airport.code.toLocaleLowerCase().includes(term)
-        || airport.city.toLocaleLowerCase().includes(term)
-        || airport.name.toLocaleLowerCase().includes(term))
+    if (!term) return supportedCarriers.slice(0, MAX_RESULTS);
+    return supportedCarriers
+      .filter((carrier) =>
+        carrier.code.toLocaleLowerCase().includes(term)
+        || carrier.name.toLocaleLowerCase().includes(term))
+      .sort((left, right) => matchRank(left, term) - matchRank(right, term)
+        || left.name.localeCompare(right.name))
       .slice(0, MAX_RESULTS);
   }, [query]);
 
-  function selectAirport(airport: Airport) {
-    onChange(airport.code);
-    setQuery(airportLabel(airport));
+  function selectCarrier(carrier: Carrier) {
+    onChange(carrier.code);
+    setQuery(carrierLabel(carrier));
     setOpen(false);
     setActiveIndex(-1);
   }
@@ -60,7 +71,7 @@ export function AirportCombobox({ id, label, value, error, onChange }: Props) {
       setActiveIndex((current) => Math.max(current - 1, 0));
     } else if (event.key === "Enter" && open && activeIndex >= 0) {
       event.preventDefault();
-      selectAirport(matches[activeIndex]);
+      selectCarrier(matches[activeIndex]);
     } else if (event.key === "Escape") {
       setOpen(false);
       setActiveIndex(-1);
@@ -81,7 +92,7 @@ export function AirportCombobox({ id, label, value, error, onChange }: Props) {
           aria-invalid={Boolean(error)}
           aria-describedby={error ? errorId : undefined}
           value={query}
-          placeholder="Search by city, airport, or IATA code"
+          placeholder="Search by airline name or code"
           autoComplete="off"
           onFocus={() => setOpen(true)}
           onBlur={() => { setOpen(false); setActiveIndex(-1); }}
@@ -104,19 +115,19 @@ export function AirportCombobox({ id, label, value, error, onChange }: Props) {
         )}
         {open && (
           <ul id={listboxId} role="listbox" className="autocomplete-options">
-            {matches.length ? matches.map((airport, index) => (
+            {matches.length ? matches.map((carrier, index) => (
               <li
                 id={`${instanceId}-${index}`}
-                key={airport.code}
+                key={carrier.code}
                 role="option"
-                aria-selected={airport.code === value}
+                aria-selected={carrier.code === value}
                 className={index === activeIndex ? "active" : undefined}
-                onMouseDown={(event) => { event.preventDefault(); selectAirport(airport); }}
+                onMouseDown={(event) => { event.preventDefault(); selectCarrier(carrier); }}
               >
-                <span>{airport.city} — {airport.name}</span>
-                <strong>{airport.code}</strong>
+                <span>{carrier.name}</span>
+                <strong>{carrier.code}</strong>
               </li>
-            )) : <li className="autocomplete-no-results">No supported airports found</li>}
+            )) : <li className="autocomplete-no-results">No supported carriers found</li>}
           </ul>
         )}
       </div>

@@ -41,6 +41,26 @@ The current artifact contains 362 airports and only the fields needed for displa
 IATA `code`, `city`, and airport `name`. This keeps unsupported airports out of the selector and
 avoids sending the full offline metadata package to browsers.
 
+## Frontend carrier reference data
+
+The carrier selector is generated with:
+
+```powershell
+.venv\Scripts\python scripts\generate_supported_carriers.py
+```
+
+The generator selects distinct `reporting_carrier` codes from the current production
+`historical_flights` table. Display names are maintained from the official BTS Unique Carrier
+lookup (`L_UNIQUE_CARRIERS`):
+
+https://www.transtats.bts.gov/Download_Lookup.asp?Lookup=L_UNIQUE_CARRIERS
+
+The current artifact contains the 15 reporting carriers present in the 2023–2025 production
+history. Generation fails when a newly observed code lacks a maintained display name, preventing
+the UI from silently omitting a supported BTS carrier. `frontend/data/supported-carriers.json`
+contains only the carrier code and display name; the selected code remains the value sent to the
+backend API.
+
 ## Retained fields
 
 | Official BTS field | Clean field | Meaning/use |
