@@ -2,6 +2,10 @@
 
 Flight Connection Probability is a web application that estimates the probability of making a U.S. domestic flight connection. It combines historical U.S. Bureau of Transportation Statistics (BTS) arrival performance with explicit, documented V1 passenger connection-time assumptions.
 
+## Live Demo
+
+[Open the Flight Connection Probability Calculator](https://flight-connection-probability.vercel.app)
+
 ## What It Does
 
 Users provide:
