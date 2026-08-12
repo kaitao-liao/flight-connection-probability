@@ -32,11 +32,17 @@ h1 { margin: 14px 0 10px; font-size: clamp(2.35rem, 5vw, 4.2rem); line-height: .
 .page-grid { width: min(1180px, calc(100% - 32px)); margin: -42px auto 50px; position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(330px, .75fr); gap: 22px; align-items: start; }
 .form-card, .empty-state, .results > *, .scenario-card, .method-card { background: var(--paper); border: 1px solid rgba(185, 202, 214, .7); border-radius: 14px; box-shadow: 0 12px 36px rgba(16, 42, 67, .075); }
 .form-card { padding: 30px; }
+.mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: -8px 0 28px; padding: 4px; border-radius: 9px; background: #e8f1f6; }
+.mode-tabs button { height: 42px; margin: 0; padding: 0 12px; border-radius: 6px; background: transparent; color: var(--muted); font-size: .76rem; }
+.mode-tabs button:hover:not(:disabled) { background: rgba(255,255,255,.65); color: var(--navy); transform: none; }
+.mode-tabs button[aria-selected="true"] { background: var(--paper); color: var(--navy); box-shadow: 0 2px 8px rgba(16,42,67,.12); }
 .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
 .section-heading h2, .section-heading h3 { margin: 3px 0 0; font-family: Georgia, "Times New Roman", serif; font-weight: 500; font-size: 1.65rem; }
 .section-heading > p { color: var(--muted); font-size: .8rem; margin: 0; text-align: right; }
 .eyebrow { margin: 0; color: var(--blue-dark); text-transform: uppercase; letter-spacing: .13em; font-size: .67rem; font-weight: 800; }
 .route-grid, .detail-grid, .time-grid { display: grid; gap: 16px; }
+.flight-number-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 16px; }
+.flight-number-grid label:last-child { grid-column: 1 / -1; }
 .route-grid { grid-template-columns: repeat(3, 1fr); position: relative; }
 .autocomplete-field { min-width: 0; display: flex; flex-direction: column; gap: 7px; }
 .autocomplete { position: relative; }
@@ -75,6 +81,20 @@ button:disabled { opacity: .72; cursor: wait; }
 .clock span { transform: rotate(118deg); height: 16px; top: 20px; }
 
 .results { display: grid; gap: 16px; }
+.schedule-card { padding: 24px; }
+.schedule-card h2 { margin: 4px 0 18px; font-family: Georgia, "Times New Roman", serif; font-size: 1.45rem; font-weight: 500; }
+.flight-schedule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.flight-schedule { padding: 15px; border: 1px solid var(--line); border-radius: 8px; background: #f8fbfd; }
+.flight-schedule h3 { margin: 5px 0 10px; font-family: Georgia, "Times New Roman", serif; font-size: 1.05rem; font-weight: 500; }
+.flight-schedule dl { margin: 0; }
+.flight-schedule dl div { display: block; padding: 6px 0; }
+.flight-schedule dt { font-size: .66rem; color: var(--muted); }
+.flight-schedule dd { margin-top: 2px; font-size: .74rem; color: var(--ink); }
+.flight-metadata, .schedule-note { color: var(--muted); font-size: .7rem; line-height: 1.5; }
+.flight-metadata { margin: 9px 0 0; }
+.schedule-note { margin: 14px 0 0; }
+.candidate-list { width: 100%; margin-top: 18px; display: grid; gap: 5px; text-align: left; font-size: .75rem; }
+.candidate-list span { padding: 7px 9px; border: 1px solid var(--line); border-radius: 5px; background: #f8fbfd; }
 .probability-card { padding: 26px; background: linear-gradient(135deg, #fff, #eef8fb); display: flex; align-items: center; justify-content: space-between; gap: 15px; }
 .probability-card h2 { font-family: Georgia, "Times New Roman", serif; font-size: 1.3rem; font-weight: 500; margin: 5px 0 0; max-width: 220px; }
 .result-context { max-width: 245px; margin: 9px 0 0; color: var(--muted); font-size: .72rem; line-height: 1.45; }
@@ -126,6 +146,8 @@ dd { margin: 0; overflow-wrap: anywhere; }
   .section-heading { display: block; }
   .section-heading > p { text-align: left; margin-top: 7px; }
   .route-grid, .time-grid { grid-template-columns: 1fr; }
+  .flight-number-grid, .flight-schedule-grid { grid-template-columns: 1fr; }
+  .flight-number-grid label:last-child { grid-column: auto; }
   .autocomplete-options { max-height: 240px; }
   .detail-grid { grid-template-columns: 1fr; }
   .probability-card { align-items: flex-start; flex-direction: column; }
