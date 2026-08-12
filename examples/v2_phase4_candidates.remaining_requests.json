@@ -1,0 +1,12 @@
+[
+  {"flight_number":"AA1133","flight_date":"2026-11-12","airline":"AA","manually_confirmed":true,"confirmation_source":"Flight.info AA1133 schedule, verified 2026-08-12"},
+  {"flight_number":"UA1234","flight_date":"2026-09-13","airline":"UA","manually_confirmed":true,"confirmation_source":"Flight.info UA1234 schedule, verified 2026-08-12"},
+  {"flight_number":"UA1170","flight_date":"2027-02-15","airline":"UA","manually_confirmed":true,"confirmation_source":"Flight.info UA1170 schedule, verified 2026-08-12"},
+  {"flight_number":"WN123","flight_date":"2026-11-10","airline":"WN","manually_confirmed":true,"confirmation_source":"Flight.info WN123 schedule, verified 2026-08-12"},
+  {"flight_number":"WN4132","flight_date":"2027-02-08","airline":"WN","manually_confirmed":true,"confirmation_source":"Flight.info WN4132 schedule, verified 2026-08-12"},
+  {"flight_number":"AS599","flight_date":"2026-09-17","airline":"AS","manually_confirmed":true,"confirmation_source":"Flight.info AS599 schedule, verified 2026-08-12"},
+  {"flight_number":"AS599","flight_date":"2026-11-12","airline":"AS","manually_confirmed":true,"confirmation_source":"Flight.info AS599 schedule, verified 2026-08-12"},
+  {"flight_number":"B61002","flight_date":"2026-09-14","airline":"B6","manually_confirmed":true,"confirmation_source":"Flight.info B61002 schedule, verified 2026-08-12"},
+  {"flight_number":"B61002","flight_date":"2026-11-12","airline":"B6","manually_confirmed":true,"confirmation_source":"Flight.info B61002 schedule, verified 2026-08-12"},
+  {"flight_number":"B61002","flight_date":"2027-02-15","airline":"B6","manually_confirmed":true,"confirmation_source":"Flight.info B61002 schedule, verified 2026-08-12"}
+]

@@ -5,6 +5,12 @@
 !backend/flight_connection/
 !backend/flight_connection/__init__.py
 !backend/flight_connection/api.py
+!backend/flight_connection/aerodatabox_provider.py
+!backend/flight_connection/deterministic_seed.py
+!backend/flight_connection/future_flight_provider.py
+!backend/flight_connection/timezone_validation.py
+!backend/flight_connection/v2_itinerary_service.py
+!backend/flight_connection/v2_schemas.py
 !backend/flight_connection/service.py
 !backend/flight_connection/schemas.py
 !backend/flight_connection/delay_model.py

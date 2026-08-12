@@ -12,7 +12,12 @@ PACKAGE = Path("backend/flight_connection")
 
 def serving_module_files() -> set[Path]:
     """Follow package-local imports from the production API entry point."""
-    pending = [PACKAGE / "api.py"]
+    pending = [
+        PACKAGE / "api.py",
+        PACKAGE / "aerodatabox_provider.py",
+        PACKAGE / "v2_itinerary_service.py",
+        PACKAGE / "v2_schemas.py",
+    ]
     discovered = {PACKAGE / "__init__.py"}
     while pending:
         module = pending.pop()
@@ -52,8 +57,24 @@ def test_production_image_includes_timezone_validation_runtime():
     assert "tzdata==2025.2" in requirements
 
 
+def test_production_image_includes_v2_http_runtime_and_serving_modules():
+    dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
+    dockerignore = Path(".dockerignore").read_text(encoding="utf-8")
+    requirements = Path("requirements-runtime.txt").read_text(encoding="utf-8")
+    assert "httpx==0.28.1" in requirements
+    for name in (
+        "aerodatabox_provider.py", "future_flight_provider.py",
+        "v2_itinerary_service.py", "v2_schemas.py",
+    ):
+        source = f"backend/flight_connection/{name}"
+        assert f"COPY {source} ./{source}" in dockerfile
+        assert f"!{source}" in dockerignore
+
+
 def test_production_image_copies_every_local_serving_module():
     dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
+    dockerignore = Path(".dockerignore").read_text(encoding="utf-8")
     for module in serving_module_files():
         source = module.as_posix()
         assert f"COPY {source} ./{source}" in dockerfile, f"Dockerfile omits {source}"
+        assert f"!{source}" in dockerignore, f"Docker context omits {source}"

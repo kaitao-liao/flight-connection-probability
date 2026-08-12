@@ -1,6 +1,9 @@
 # Deployment guide
 
-This guide prepares V1 for public HTTPS access without changing its modeling code. Current V1 explicitly exposes the 20-minute deplaning assumption, Triangular(15,25,40) gate-transfer assumption, 15-minute boarding cutoff, and temporal coverage metadata required for transparent serving.
+This guide prepares the frozen V1 estimator and the V2 flight-number backend endpoint
+for public HTTPS access without changing model behavior. V2 uses AeroDataBox only to
+resolve future schedules; existing BTS evidence and `ConnectionRiskService` continue to
+produce the probability.
 
 The earlier serving/validation lookback mismatch has been resolved. See [the serving alignment report](serving_alignment.md) for the shared temporal implementation, boundaries, rebuilt database, exact equivalence results, and 2024/2025 revalidation.
 
@@ -44,13 +47,19 @@ Measured on 2026-08-10:
 | Normal measured API RSS | about 66 MiB | Observational sizing result, not a hard maximum. |
 | Global-fallback measured peak RSS | about 397 MiB | Use at least 1 GiB RAM; load-test before public promotion. |
 
-The runtime dependency lock is `requirements-runtime.txt`: FastAPI, Uvicorn, DuckDB, NumPy, Pydantic, and their pinned runtime dependencies. Development-only `pytest` and `httpx` are excluded from the image. The local Git-ignored DuckDB is excluded from both Git and the Docker build context.
+The runtime dependency lock is `requirements-runtime.txt`: FastAPI, Uvicorn, DuckDB,
+NumPy, Pydantic, httpx, and their pinned runtime dependencies. httpx is a production
+dependency for V2; pytest remains development-only. The local Git-ignored DuckDB is
+excluded from both Git and the Docker build context.
 
 ### Artifact boundaries
 
 Production serving files:
 
-- `backend/flight_connection/api.py`, `service.py`, `schemas.py`, `delay_model.py`, `simulator.py`, and `acquire.py` (the last supplies the time-bucket helper imported by the estimator)
+- V1 serving modules: `api.py`, `service.py`, `schemas.py`, `delay_model.py`,
+  `simulator.py`, `deterministic_seed.py`, `timezone_validation.py`, and `acquire.py`
+- V2 serving modules: `aerodatabox_provider.py`, `future_flight_provider.py`,
+  `v2_itinerary_service.py`, and `v2_schemas.py`
 - the Python package metadata and pinned `requirements-runtime.txt`
 - `data/production/flights_production.duckdb`
 - `frontend/app`, frontend configuration, package manifest, and lockfile
@@ -139,10 +148,22 @@ docker run --rm --name flight-connection-api `
   --publish 8000:8000 `
   --env FLIGHT_CONNECTION_ENV=production `
   --env FLIGHT_CONNECTION_CORS_ORIGINS=http://localhost:3000 `
+  --env AERODATABOX_API_KEY=YOUR_API_MARKET_KEY `
   flight-connection-api:v1
 ```
 
 The container uses one Uvicorn worker. Multiple worker processes would multiply peak memory and are unnecessary for a portfolio MVP. `PORT` defaults to 8000 and is honored when supplied by a platform. Startup validates the database file, table, columns, and non-empty row count. A missing or corrupt database stops startup; there is no sample-data fallback.
+
+Import and startup register `POST /api/v2/connection-risk` but do not construct the
+credential-bearing provider or make a network request. The provider reads
+`AERODATABOX_API_KEY` only when a V2 schedule lookup is requested. A missing credential
+returns `provider_configuration_error`; secrets and credential headers are never
+returned. V1 requests never invoke AeroDataBox.
+
+V2 currently looks up both flight numbers using the request's single `travel_date`.
+Phase 6A does not guess a next-day date for the second leg, so a following-calendar-day
+second flight is a known limitation. There are no automatic retries, discovery calls,
+cache, request coalescing, or quota probes.
 
 ## Push source to GitHub
 
@@ -164,7 +185,12 @@ Do not attach raw BTS archives or the full DuckDB to GitHub releases. The servin
 FLIGHT_CONNECTION_ENV=production
 FLIGHT_CONNECTION_DB=/app/data/production/flights_production.duckdb
 FLIGHT_CONNECTION_CORS_ORIGINS=https://YOUR_VERCEL_PROJECT.vercel.app
+AERODATABOX_API_KEY=YOUR_API_MARKET_KEY
 ```
+
+`AERODATABOX_API_KEY` is a secret API.Market credential. Configure it only in the
+Railway backend environment; never expose it to Vercel, browser code, logs, or source
+control.
 
 Railway supplies `PORT`; do not override it unless necessary.
 
@@ -172,6 +198,12 @@ Railway supplies `PORT`; do not override it unless necessary.
 5. Under Networking → Public Networking, generate a Railway domain.
 6. Verify `https://YOUR_API.up.railway.app/health` returns `{"status":"ok"}`.
 7. Save the HTTPS API origin for the frontend deployment.
+
+The V2 endpoint accepts `first_flight_number`, `second_flight_number`, and one
+`travel_date`. AeroDataBox supplies normalized future schedule and optional enrichment;
+BTS supplies historical arrival delays to the unchanged estimator. Predictions later
+than the latest BTS record retain `model.historical_coverage.freshness_warning` in the
+response; production must not suppress it.
 
 ## Deploy the frontend to Vercel
 
@@ -219,6 +251,8 @@ Missing-database failure is a startup test, not a public destructive test. Verif
 - **Docker download fails:** confirm Railway can reach the public versioned GitHub Release asset. Do not bypass the failed download.
 - **Docker checksum fails:** stop the deployment. Verify the release asset independently and publish a new versioned asset plus checksum instead of weakening or removing verification.
 - **Backend will not start:** confirm the image contains `/app/data/production/flights_production.duckdb`, its checksum matches the release record, and all eight serving columns exist.
+- **V2 returns `provider_configuration_error`:** confirm `AERODATABOX_API_KEY` is set in
+  the backend environment. Do not print it while troubleshooting.
 - **Container is killed under load:** move to at least 1 GiB RAM, keep one worker, and inspect whether requests are reaching `global` fallback.
 - **Railway bill exceeds the base plan:** inspect memory/CPU graphs, set usage limits, and consider controlled sleep for a demo that does not need continuous availability.
 - **Railway does not redeploy after a push:** confirm the service source is the GitHub repository, the pushed branch matches the configured production branch, and automatic deployments are enabled.
