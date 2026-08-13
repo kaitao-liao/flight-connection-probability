@@ -88,12 +88,22 @@ describe("ConnectionRiskCalculator", () => {
     expect(JSON.parse(String((options as RequestInit).body))).toEqual({ first_flight_number: "DL1575", second_flight_number: "DL5798", travel_date: "2026-08-20" });
   });
 
-  it("renders V2 ambiguous candidates without fabricating a probability", async () => {
-    mockJson({ ...v2Success, status: "ambiguous", itinerary: null, probability_result: null, ambiguous_legs: [{ leg: "first", candidates: [v2Success.itinerary.first_flight] }] });
-    render(<ConnectionRiskCalculator />); await submitFlightNumbers();
-    expect(await screen.findByText("More than one schedule matched")).toBeInTheDocument();
-    expect(screen.getByText("DL1575: ATL → JFK")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Probability of making the connection" })).not.toBeInTheDocument();
+  it("resubmits an explicitly selected ambiguous candidate", async () => {
+    const reverse = flight("DL1575", "JFK", "ATL", "2026-08-20T12:00:00-04:00", "2026-08-20T14:00:00-04:00");
+    const ambiguous = { ...v2Success, status: "ambiguous", itinerary: null, probability_result: null, ambiguous_legs: [{ leg: "first", candidates: [reverse, v2Success.itinerary.first_flight] }] };
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ambiguous })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => v2Success }));
+    render(<ConnectionRiskCalculator />); const user = await submitFlightNumbers();
+    expect(await screen.findByText("Choose the matching schedule")).toBeInTheDocument();
+    const continueButton = screen.getByRole("button", { name: "Continue with selected flights" });
+    expect(continueButton).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: /DL1575: ATL → JFK/i }));
+    expect(continueButton).toBeEnabled();
+    await user.click(continueButton);
+    expect(await screen.findByText("59.1", { exact: false })).toBeInTheDocument();
+    const [, options] = vi.mocked(fetch).mock.calls[1];
+    expect(JSON.parse(String((options as RequestInit).body)).first_candidate_index).toBe(1);
   });
 
   it("shows safe V2 domain errors", async () => {

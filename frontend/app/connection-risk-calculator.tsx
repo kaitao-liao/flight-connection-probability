@@ -138,6 +138,7 @@ const statusMessages: Record<Exclude<V2ConnectionResponse["status"], "success" |
   provider_data_quality_error: "The schedule provider returned incomplete required flight times.",
   provider_temporarily_unavailable: "The flight schedule provider is temporarily unavailable. Try again later.",
   provider_configuration_error: "Flight-number search is not configured on the backend.",
+  invalid_candidate_selection: "The selected flight candidate is no longer available. Search again.",
 };
 
 export function ConnectionRiskCalculator() {
@@ -148,14 +149,15 @@ export function ConnectionRiskCalculator() {
   const [flightErrors, setFlightErrors] = useState<FlightErrors>({});
   const [result, setResult] = useState<ConnectionRiskResponse | null>(null);
   const [v2Response, setV2Response] = useState<V2ConnectionResponse | null>(null);
+  const [candidateSelections, setCandidateSelections] = useState<Partial<Record<"first" | "second", number>>>({});
   const [apiError, setApiError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const activeRequest = useRef<AbortController | null>(null);
 
   function clearOutput() { activeRequest.current?.abort(); activeRequest.current = null; setLoading(false); setResult(null); setV2Response(null); setApiError(null); }
-  function changeMode(next: Mode) { if (next === mode) return; clearOutput(); setMode(next); }
+  function changeMode(next: Mode) { if (next === mode) return; clearOutput(); setCandidateSelections({}); setMode(next); }
   function updateManual(key: keyof ItineraryRequest, value: string) { clearOutput(); setManualForm((current) => ({ ...current, [key]: value })); setManualErrors((current) => ({ ...current, [key]: undefined })); }
-  function updateFlight(key: keyof FlightNumberRequest, value: string) { clearOutput(); setFlightForm((current) => ({ ...current, [key]: value })); setFlightErrors((current) => ({ ...current, [key]: undefined })); }
+  function updateFlight(key: keyof FlightNumberRequest, value: string) { clearOutput(); setCandidateSelections({}); setFlightForm((current) => ({ ...current, [key]: value })); setFlightErrors((current) => ({ ...current, [key]: undefined })); }
 
   async function submitManual(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const errors = validateManual(manualForm); setManualErrors(errors); setApiError(null); setResult(null); setV2Response(null);
@@ -165,7 +167,13 @@ export function ConnectionRiskCalculator() {
   async function submitFlight(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const errors = validateFlight(flightForm); setFlightErrors(errors); setApiError(null); setResult(null); setV2Response(null);
     if (Object.keys(errors).length) { requestAnimationFrame(() => document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()); return; }
-    const payload = { ...flightForm, first_flight_number: normalizeFlightNumber(flightForm.first_flight_number), second_flight_number: normalizeFlightNumber(flightForm.second_flight_number) };
+    const payload = {
+      ...flightForm,
+      first_flight_number: normalizeFlightNumber(flightForm.first_flight_number),
+      second_flight_number: normalizeFlightNumber(flightForm.second_flight_number),
+      ...(candidateSelections.first !== undefined && { first_candidate_index: candidateSelections.first }),
+      ...(candidateSelections.second !== undefined && { second_candidate_index: candidateSelections.second }),
+    };
     await request(async (signal) => {
       const v2 = await estimateConnectionRiskByFlightNumber(payload, signal);
       if (v2.status !== "success" || !v2.probability_result || !v2.itinerary) {
@@ -213,7 +221,7 @@ export function ConnectionRiskCalculator() {
           </form>
         </>}
       </section>
-      {result ? <ResultPanel result={result} v2={v2Response ?? undefined} /> : v2Response?.status === "ambiguous" ? <aside className="empty-state ambiguous-state"><h2>More than one schedule matched</h2><p>Selecting among multiple segments is not available yet. Check the flight numbers and date, then enter the itinerary manually if needed.</p>{v2Response.ambiguous_legs.map((item) => <div key={item.leg} className="candidate-list"><strong>{item.leg === "first" ? "First flight" : "Second flight"}</strong>{item.candidates.map((candidate) => <span key={`${candidate.marketing_flight_number}-${candidate.origin}-${candidate.destination}-${candidate.scheduled_departure}`}>{candidate.marketing_flight_number}: {candidate.origin} → {candidate.destination}</span>)}</div>)}</aside> : <aside className="empty-state"><div className="clock" aria-hidden="true"><span /></div><h2>Your estimate will appear here</h2><p>{mode === "flight-number" ? "Enter both flight numbers and a travel date to resolve the schedule and estimate the connection." : "Enter the scheduled itinerary to compare the layover against historical delays and simulated transfer times."}</p></aside>}
+      {result ? <ResultPanel result={result} v2={v2Response ?? undefined} /> : v2Response?.status === "ambiguous" ? <aside className="empty-state ambiguous-state"><h2>Choose the matching schedule</h2><p>Select one candidate for each ambiguous flight, then continue.</p>{v2Response.ambiguous_legs.map((item) => <div key={item.leg} className="candidate-list"><strong>{item.leg === "first" ? "First flight" : "Second flight"}</strong>{item.candidates.map((candidate, index) => <button type="button" className="candidate-option" aria-pressed={candidateSelections[item.leg] === index} onClick={() => setCandidateSelections((current) => ({ ...current, [item.leg]: index }))} key={`${candidate.marketing_flight_number}-${candidate.origin}-${candidate.destination}-${candidate.scheduled_departure}`}><span>{candidate.marketing_flight_number}: {candidate.origin} → {candidate.destination}</span><small>{formatScheduleTime(candidate.scheduled_departure)} → {formatScheduleTime(candidate.scheduled_arrival)}</small></button>)}</div>)}<button type="button" disabled={loading || v2Response.ambiguous_legs.some((item) => candidateSelections[item.leg] === undefined)} onClick={() => { const form = document.querySelector<HTMLFormElement>('.form-card form'); form?.requestSubmit(); }}>{loading ? "Calculating…" : "Continue with selected flights"}</button></aside> : <aside className="empty-state"><div className="clock" aria-hidden="true"><span /></div><h2>Your estimate will appear here</h2><p>{mode === "flight-number" ? "Enter both flight numbers and a travel date to resolve the schedule and estimate the connection." : "Enter the scheduled itinerary to compare the layover against historical delays and simulated transfer times."}</p></aside>}
     </div>
     <footer className="disclaimer"><strong>Experimental research tool.</strong> Results are estimates, not guarantees. Historical delay evidence excludes cancellations and diversions. Real-time conditions and airport-specific walking times are not modeled; terminal, gate, and aircraft details appear only when the schedule provider supplies them.</footer>
   </main>;

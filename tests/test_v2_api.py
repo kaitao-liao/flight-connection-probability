@@ -44,6 +44,32 @@ def test_v2_endpoint_uses_injected_service_and_schema(development_database):
     assert service.requests[0].first_flight_number == "DL1234"
 
 
+def test_v2_endpoint_accepts_optional_candidate_indices(development_database):
+    service = StubV2Service(V2ConnectionResponse(status="schedule_not_found", leg="first"))
+    client = TestClient(create_app(
+        service=ConnectionRiskService(development_database), v2_service=service,
+    ))
+    response = client.post("/api/v2/connection-risk", json={
+        "first_flight_number": "DL1234", "second_flight_number": "DL5678",
+        "travel_date": "2026-08-20", "first_candidate_index": 1,
+    })
+    assert response.status_code == 200
+    assert service.requests[0].first_candidate_index == 1
+
+
+def test_v2_endpoint_rejects_negative_candidate_index(development_database):
+    service = StubV2Service(V2ConnectionResponse(status="schedule_not_found", leg="first"))
+    client = TestClient(create_app(
+        service=ConnectionRiskService(development_database), v2_service=service,
+    ))
+    response = client.post("/api/v2/connection-risk", json={
+        "first_flight_number": "DL1234", "second_flight_number": "DL5678",
+        "travel_date": "2026-08-20", "first_candidate_index": -1,
+    })
+    assert response.status_code == 422
+    assert service.requests == []
+
+
 def test_unconfigured_v2_provider_is_safe_and_does_not_construct_live_provider(development_database):
     client = TestClient(create_app(service=ConnectionRiskService(development_database)))
     response = client.post("/api/v2/connection-risk", json={

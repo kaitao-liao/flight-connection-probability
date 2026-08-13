@@ -61,6 +61,8 @@ export type FlightNumberRequest = {
   first_flight_number: string;
   second_flight_number: string;
   travel_date: string;
+  first_candidate_index?: number;
+  second_candidate_index?: number;
 };
 
 export type ResolvedFlight = {
@@ -90,7 +92,8 @@ export type V2ConnectionResponse = {
     | "invalid_chronology"
     | "provider_data_quality_error"
     | "provider_temporarily_unavailable"
-    | "provider_configuration_error";
+    | "provider_configuration_error"
+    | "invalid_candidate_selection";
   itinerary: {
     first_flight: ResolvedFlight;
     second_flight: ResolvedFlight;

@@ -185,6 +185,49 @@ def test_both_legs_ambiguous_are_both_preserved(development_database):
     assert len(provider.calls) == 2
 
 
+def test_selected_first_candidate_continues_workflow(development_database):
+    first, second = standard_flights()
+    wrong_direction = flight(
+        "DL1234", "JFK", "ATL", datetime(2026, 8, 20, 12),
+        datetime(2026, 8, 20, 14),
+    )
+    subject, _ = service(
+        development_database, result(wrong_direction, first), result(second),
+    )
+    selected = request().model_copy(update={"first_candidate_index": 1})
+    response = subject.estimate(selected)
+    assert response.status == "success"
+    assert response.itinerary.first_flight.origin == "ATL"
+    assert response.itinerary.connection_airport == "JFK"
+
+
+def test_selected_second_candidate_continues_workflow(development_database):
+    first, second = standard_flights()
+    wrong_direction = flight(
+        "DL5678", "BOS", "JFK", datetime(2026, 8, 20, 19, 10),
+        datetime(2026, 8, 20, 20, 30),
+    )
+    subject, _ = service(
+        development_database, result(first), result(wrong_direction, second),
+    )
+    selected = request().model_copy(update={"second_candidate_index": 1})
+    response = subject.estimate(selected)
+    assert response.status == "success"
+    assert response.itinerary.second_flight.destination == "BOS"
+
+
+def test_out_of_range_candidate_index_is_rejected_safely(development_database):
+    first, second = standard_flights()
+    subject, _ = service(
+        development_database, result(first, first), result(second),
+    )
+    selected = request().model_copy(update={"first_candidate_index": 9})
+    response = subject.estimate(selected)
+    assert response.status == "invalid_candidate_selection"
+    assert response.leg == "first"
+    assert "9" not in response.message
+
+
 def test_missing_terminal_and_gate_do_not_block(development_database):
     first, second = standard_flights()
     first = flight(

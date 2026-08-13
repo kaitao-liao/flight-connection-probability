@@ -37,12 +37,23 @@ class V2ItineraryService:
         if isinstance(second, V2ConnectionResponse):
             return second
 
+        first_candidate = self._select_candidate(
+            first, request.first_candidate_index, "first"
+        )
+        if isinstance(first_candidate, V2ConnectionResponse):
+            return first_candidate
+        second_candidate = self._select_candidate(
+            second, request.second_candidate_index, "second"
+        )
+        if isinstance(second_candidate, V2ConnectionResponse):
+            return second_candidate
+
         ambiguous = []
-        if len(first.candidates) > 1:
+        if first_candidate is None:
             ambiguous.append(AmbiguousLeg(
                 leg="first", candidates=[_resolved(candidate) for candidate in first.candidates]
             ))
-        if len(second.candidates) > 1:
+        if second_candidate is None:
             ambiguous.append(AmbiguousLeg(
                 leg="second", candidates=[_resolved(candidate) for candidate in second.candidates]
             ))
@@ -52,8 +63,6 @@ class V2ItineraryService:
                 message="Select one schedule candidate for each ambiguous leg.",
             )
 
-        first_candidate = first.candidates[0]
-        second_candidate = second.candidates[0]
         if first_candidate.destination_iata != second_candidate.origin_iata:
             return V2ConnectionResponse(
                 status="invalid_connection_airport",
@@ -161,6 +170,19 @@ class V2ItineraryService:
                 message=f"No schedule was found for the {leg} flight.",
             )
         return result
+
+    @staticmethod
+    def _select_candidate(result, selected_index, leg):
+        if selected_index is not None:
+            if selected_index >= len(result.candidates):
+                return V2ConnectionResponse(
+                    status="invalid_candidate_selection", leg=leg,
+                    message=f"The selected {leg}-flight candidate is no longer available.",
+                )
+            return result.candidates[selected_index]
+        if len(result.candidates) == 1:
+            return result.candidates[0]
+        return None
 
 
 def _airport_instant(value: datetime, airport: str) -> datetime:

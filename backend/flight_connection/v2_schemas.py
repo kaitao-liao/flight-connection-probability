@@ -15,6 +15,8 @@ class V2ConnectionRequest(BaseModel):
     first_flight_number: str = Field(min_length=3, max_length=8)
     second_flight_number: str = Field(min_length=3, max_length=8)
     travel_date: date
+    first_candidate_index: int | None = Field(default=None, ge=0)
+    second_candidate_index: int | None = Field(default=None, ge=0)
 
     @field_validator("first_flight_number", "second_flight_number")
     @classmethod
@@ -59,6 +61,7 @@ V2Status = Literal[
     "success", "ambiguous", "schedule_not_found", "invalid_connection_airport",
     "invalid_chronology", "provider_data_quality_error",
     "provider_temporarily_unavailable", "provider_configuration_error",
+    "invalid_candidate_selection",
 ]
 
 

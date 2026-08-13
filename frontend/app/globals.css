@@ -94,7 +94,10 @@ button:disabled { opacity: .72; cursor: wait; }
 .flight-metadata { margin: 9px 0 0; }
 .schedule-note { margin: 14px 0 0; }
 .candidate-list { width: 100%; margin-top: 18px; display: grid; gap: 5px; text-align: left; font-size: .75rem; }
-.candidate-list span { padding: 7px 9px; border: 1px solid var(--line); border-radius: 5px; background: #f8fbfd; }
+.candidate-option { height: auto; min-height: 52px; margin: 0; padding: 9px 11px; align-items: flex-start; flex-direction: column; gap: 3px; border: 1px solid var(--line); border-radius: 6px; background: #f8fbfd; color: var(--ink); text-align: left; }
+.candidate-option:hover:not(:disabled) { background: var(--sky); color: var(--ink); transform: none; }
+.candidate-option[aria-pressed="true"] { border-color: var(--blue); background: var(--sky); box-shadow: 0 0 0 2px rgba(19,124,159,.13); }
+.candidate-option small { color: var(--muted); font-size: .66rem; }
 .probability-card { padding: 26px; background: linear-gradient(135deg, #fff, #eef8fb); display: flex; align-items: center; justify-content: space-between; gap: 15px; }
 .probability-card h2 { font-family: Georgia, "Times New Roman", serif; font-size: 1.3rem; font-weight: 500; margin: 5px 0 0; max-width: 220px; }
 .result-context { max-width: 245px; margin: 9px 0 0; color: var(--muted); font-size: .72rem; line-height: 1.45; }
