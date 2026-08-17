@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ConnectionRiskCalculator } from "./connection-risk-calculator";
+import { SiteShell } from "./site-shell";
 
 export const metadata: Metadata = {
   title: "Will I Make My Connection?",
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function Home() {
-  return <ConnectionRiskCalculator />;
+  return <SiteShell />;
 }
